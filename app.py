@@ -80,9 +80,18 @@ with tab1:
 with tab2:
     st.subheader("Koppla Setnr (Maxnr) till SetBet & Set")
     
-    # Tabell för att hantera Sets
+    # Konvertera listan till DataFrame
     set_df = pd.DataFrame(st.session_state.set_mapping)
-    edited_set_df = st.data_editor(set_df, num_rows="dynamic", use_container_width=True)
+    
+    # Använd en unik key för att bevara editorns tillstånd
+    edited_set_df = st.data_editor(
+        set_df, 
+        num_rows="dynamic", 
+        use_container_width=True,
+        key="set_mapping_editor"
+    )
+    
+    # Uppdatera session state endast om det faktiskt finns ändringar
     st.session_state.set_mapping = edited_set_df.to_dict("records")
     
     st.divider()
@@ -111,7 +120,7 @@ with tab2:
             if new_opt not in st.session_state.extra_options:
                 st.session_state.extra_options.append(new_opt)
                 st.rerun()
-
+                
 # --- FLIK 3: LÄGG TILL NYTT KORT ---
 with tab3:
     st.subheader("Lägg till ett nytt kort i samlingen")
