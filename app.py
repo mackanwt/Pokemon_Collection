@@ -26,7 +26,6 @@ if "names" not in st.session_state:
 if "extra_options" not in st.session_state:
     st.session_state.extra_options = ["Holo", "Reverse Holo", "Non-Holo", "1st Edition"]
 
-# Sets lagras som en ren lista av ordböcker
 if "sets_list" not in st.session_state:
     st.session_state.sets_list = [
         {"Maxnr": "111", "SetBet": "CIN", "Set": "Crimson Invasion (CIN)"},
@@ -80,11 +79,9 @@ with tab1:
 with tab2:
     st.subheader("Befintliga Sets")
     
-    # Visa befintliga sets i en ren tabell (ej redigerbar som nollställs)
     sets_df = pd.DataFrame(st.session_state.sets_list)
     st.dataframe(sets_df, use_container_width=True)
 
-    # Formulär för att säkert lägga till nya sets
     st.subheader("➕ Lägg till nytt Set")
     with st.form("add_set_form_fixed", clear_on_submit=True):
         col_s1, col_s2, col_s3 = st.columns(3)
@@ -99,13 +96,12 @@ with tab2:
         
         if submit_set:
             if new_maxnr and new_setbet:
-                # Lägg till i listan direkt
                 st.session_state.sets_list.append({
                     "Maxnr": new_maxnr.strip(),
                     "SetBet": new_setbet.strip(),
                     "Set": new_setname.strip()
                 })
-                st.success(f"Svarade och sparade Set: {new_setbet}")
+                st.success(f"Sparade Set: {new_setbet}")
                 st.rerun()
             else:
                 st.error("Du måste fylla i både Maxnr och SetBet!")
@@ -155,21 +151,20 @@ with tab3:
         with col_b:
             setnr = st.text_input("Setnr. (t.ex. 12/111)", value="12/111")
             
-            # Logik för att filtrera SetBet utifrån nämnaren i Setnr
+            # Korrigerad referens till session_state
             max_nr = setnr.split("/")[-1].strip() if "/" in setnr else ""
-            matching_sets = [s for s in st.session_state.st.session_state.sets_list if str(s.get("Maxnr")).strip() == max_nr] if "sets_list" in st.session_state else []
+            all_sets = st.session_state.sets_list
+            matching_sets = [s for s in all_sets if str(s.get("Maxnr")).strip() == max_nr]
             
-            # Om ingen matchning hittas, visa alla sets
-            if not matching_sets and "sets_list" in st.session_state:
-                matching_sets = st.session_state.sets_list
+            if not matching_sets:
+                matching_sets = all_sets
 
             setbet_options = [s["SetBet"] for s in matching_sets]
             
             selected_setbet = st.selectbox("SetBet.", setbet_options if setbet_options else ["-"])
             
-            # Auto-fyll fullt Set-namn
             auto_set_name = ""
-            for s in st.session_state.sets_list:
+            for s in all_sets:
                 if s.get("SetBet") == selected_setbet:
                     auto_set_name = s.get("Set")
                     break
