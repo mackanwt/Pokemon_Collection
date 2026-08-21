@@ -112,19 +112,39 @@ with tab1:
         df_display = collection_df.copy()
         df_display["Värde idag (SEK)"] = (df_display["Värde (EUR)"] * current_rate).round(2)
         
-        # Knapp för att slå på/av redigeringsläge
+        # Ordning och konfiguration för kompakt kolumnbredd
+        columns_order = [
+            "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
+            "Övrigt", "Skick", "Köpt för (EUR)", "Köpt för (SEK)", 
+            "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
+        ]
+        
+        column_config = {
+            "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
+            "Språk": st.column_config.TextColumn("Språk", width="small"),
+            "Namn": st.column_config.TextColumn("Namn", width="medium"),
+            "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
+            "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
+            "Set": st.column_config.TextColumn("Set", width="large"),
+            "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
+            "Skick": st.column_config.TextColumn("Skick", width="small"),
+            "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", width="small", format="%.2f"),
+            "Köpt för (SEK)": st.column_config.NumberColumn("Köpt (SEK)", width="small", disabled=True, format="%.2f"),
+            "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
+            "Datum tillagd": st.column_config.DateColumn("Datum", width="small"),
+            "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
+        }
+
         edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
         if edit_mode:
             edited_df = st.data_editor(
                 df_display,
+                column_order=columns_order,
+                column_config=column_config,
                 num_rows="dynamic",
                 use_container_width=True,
-                key="main_collection_editor",
-                column_config={
-                    "Köpt för (SEK)": st.column_config.NumberColumn(disabled=True),
-                    "Värde idag (SEK)": st.column_config.NumberColumn(disabled=True),
-                }
+                key="main_collection_editor"
             )
             
             if st.button("💾 Spara ändringar i samlingen", type="primary"):
@@ -133,12 +153,26 @@ with tab1:
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            # st.dataframe stöder inbyggd klicksortering på rubrikerna
             st.dataframe(
                 df_display,
+                column_order=columns_order,
+                column_config=column_config,
                 use_container_width=True,
                 hide_index=True
             )
+
+        # Totalsummeringar längst ned
+        total_value_sek = df_display["Värde idag (SEK)"].sum()
+        total_cost_sek = df_display["Köpt för (SEK)"].sum()
+        total_profit_sek = total_value_sek - total_cost_sek
+
+        st.divider()
+        col_empty, col_val, col_profit = st.columns([2, 1, 1])
+        with col_val:
+            st.metric("Totalt värde (SEK)", f"{total_value_sek:,.2f} kr")
+        with col_profit:
+            st.metric("Total vinst (SEK)", f"{total_profit_sek:,.2f} kr", delta=f"{total_profit_sek:,.2f} kr")
+
     else:
         st.info("Samlingen är tom.")
 
