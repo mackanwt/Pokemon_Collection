@@ -12,6 +12,7 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
 FILE_PATH = "data.json"
 
+# --- ALLA DINA 36 KORT OCH INSTÄLLNINGAR DIRECT I KODEN ---
 DEFAULT_DATA = {
     "collection": [
         {"Pärmnummer": 1, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "31/111", "SetBet.": "CIN", "Set": "Crimson Invasion (CIN)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 2.0, "Datum tillagd": "2026-08-21"},
@@ -90,7 +91,10 @@ def load_data_from_github():
         if res.status_code == 200:
             content = res.json()["content"]
             decoded_data = base64.b64decode(content).decode('utf-8')
-            return json.loads(decoded_data)
+            loaded = json.loads(decoded_data)
+            # Om filen på GitHub finns men har tom samling, använd DEFAULT_DATA istället
+            if loaded.get("collection"):
+                return loaded
     except Exception:
         pass
 
@@ -98,7 +102,7 @@ def load_data_from_github():
 
 def save_data_to_github(data_dict):
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        st.error("Saknar GITHUB_TOKEN eller GITHUB_REPO i Secrets!")
+        st.warning("GITHUB_TOKEN eller GITHUB_REPO saknas i Secrets. Ändringen sparades bara för denna session.")
         return
 
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
@@ -113,7 +117,7 @@ def save_data_to_github(data_dict):
     encoded_content = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
 
     payload = {
-        "message": "Uppdaterade samling/inställningar [via Streamlit]",
+        "message": "Uppdaterade samling [via Streamlit]",
         "content": encoded_content
     }
     if sha:
@@ -123,6 +127,7 @@ def save_data_to_github(data_dict):
     if res_put.status_code not in [200, 201]:
         st.error(f"Kunde inte spara till GitHub: {res_put.text}")
 
+# Initialisera data
 if "app_data" not in st.session_state:
     st.session_state.app_data = load_data_from_github()
 
@@ -170,10 +175,10 @@ with tab1:
         if st.button("💾 Spara ändringar i tabellen", type="primary"):
             app_data["collection"] = edited_df.to_dict(orient="records")
             save_data_to_github(app_data)
-            st.success("Ändringar sparades till GitHub!")
+            st.success("Ändringar sparades permanent!")
             st.rerun()
     else:
-        st.info("Samlingen är tom. Lägg till kort under fliken 'Lägg till Kort'.")
+        st.info("Samlingen är tom.")
 
 # --- FLIK 2: INSTÄLLNINGAR & SETS ---
 with tab2:
@@ -241,5 +246,5 @@ with tab3:
             
             app_data["collection"].append(new_card)
             save_data_to_github(app_data)
-            st.success(f"Kortet {namn} sparades permanent till GitHub!")
+            st.success(f"Kortet {namn} sparades!")
             st.rerun()
