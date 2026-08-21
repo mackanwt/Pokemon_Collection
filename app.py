@@ -7,14 +7,80 @@ from datetime import date
 
 st.set_page_config(page_title="Pokémon Samling", layout="wide")
 
-# --- GITHUB INTEGRATION (SPARA OCH LÄS) ---
+# --- GITHUB INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
 FILE_PATH = "data.json"
 
+DEFAULT_DATA = {
+    "collection": [
+        {"Pärmnummer": 1, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "31/111", "SetBet.": "CIN", "Set": "Crimson Invasion (CIN)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 2.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 2, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "31/111", "SetBet.": "CIN", "Set": "Crimson Invasion (CIN)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 2.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 3, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "57/236", "SetBet.": "UNM", "Set": "Unified Minds (UNM)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 6.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 4, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "30/30", "SetBet.": "TK10 A30", "Set": "SM Trainer Kit: Lycanroc & Alolan Raichu", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 3.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 5, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "30/30", "SetBet.": "TK10 A30", "Set": "SM Trainer Kit: Lycanroc & Alolan Raichu", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 3.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 6, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "SM65", "SetBet.": "SMP", "Set": "SM Black Star Promos", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 5.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 7, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "SM72", "SetBet.": "SMP", "Set": "SM Black Star Promos", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 22.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 8, "Språk": "ENG", "Namn": "Togepi", "Setnr.": "9/12", "SetBet.": "MCD16", "Set": "McDonald's Collection 2016 (MCD16)", "Övrigt": "Holo", "Skick": "GD", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 12.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 9, "Språk": "ENG", "Namn": "Togepi", "Setnr.": "9/12", "SetBet.": "MCD16", "Set": "McDonald's Collection 2016 (MCD16)", "Övrigt": "Holo", "Skick": "EX", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 13.5, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 10, "Språk": "JPN", "Namn": "Togepi", "Setnr.": "UNP", "SetBet.": "UNP", "Set": "Unnumbered Promos (UNP)", "Övrigt": "", "Skick": "GD", "Köpt för (EUR)": 1.04, "Köpt för (SEK)": 12.0, "Värde (EUR)": 38.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 11, "Språk": "ENG", "Namn": "Togetic", "Setnr.": "137/214", "SetBet.": "UNB", "Set": "Unbroken Bonds (UNB)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.3, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 12, "Språk": "JPN", "Namn": "Togetic", "Setnr.": "N1", "SetBet.": "N1", "Set": "Gold, Silver, to a New World (N1)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 1.04, "Köpt för (SEK)": 12.0, "Värde (EUR)": 15.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 13, "Språk": "ENG", "Namn": "Ampharos", "Setnr.": "78/214", "SetBet.": "LOT", "Set": "Lost Thunder (LOT)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 1.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 14, "Språk": "ENG", "Namn": "Infernape", "Setnr.": "59/131", "SetBet.": "FLI", "Set": "Forbidden Light (FLI)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 1.5, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 15, "Språk": "ENG", "Namn": "Infernape", "Setnr.": "59/131", "SetBet.": "FLI", "Set": "Forbidden Light (FLI)", "Övrigt": "Reverse Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 2.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 16, "Språk": "ENG", "Namn": "Infernape", "Setnr.": "23/156", "SetBet.": "UPR", "Set": "Ultra Prism (UPR)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.5, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 17, "Språk": "ENG", "Namn": "Pachirisu", "Setnr.": "80/214", "SetBet.": "LOT", "Set": "Lost Thunder (LOT)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.5, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 18, "Språk": "ENG", "Namn": "Pachirisu", "Setnr.": "80/214", "SetBet.": "LOT", "Set": "Lost Thunder (LOT)", "Övrigt": "Reverse Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 10.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 19, "Språk": "ENG", "Namn": "Pachirisu", "Setnr.": "49/156", "SetBet.": "UPR", "Set": "Ultra Prism (UPR)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.03, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 20, "Språk": "JPN", "Namn": "Pachirisu", "Setnr.": "019/051", "SetBet.": "BW8t", "Set": "Thunder Knuckle (BW8t)", "Övrigt": "1st ed", "Skick": "EX", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 1.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 21, "Språk": "JPN", "Namn": "Pachirisu", "Setnr.": "025/088", "SetBet.": "XY4", "Set": "Phantom Gate (XY4)", "Övrigt": "1st ed", "Skick": "EX", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.6, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 22, "Språk": "ENG", "Namn": "Dragalge", "Setnr.": "53/131", "SetBet.": "FLI", "Set": "Forbidden Light (FLI)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.3, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 23, "Språk": "ENG", "Namn": "Goodra", "Setnr.": "94/131", "SetBet.": "FLI", "Set": "Forbidden Light (FLI)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.8, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 24, "Språk": "ENG", "Namn": "Goodra", "Setnr.": "94/131", "SetBet.": "FLI", "Set": "Forbidden Light (FLI)", "Övrigt": "Reverse Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 1.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 25, "Språk": "ENG", "Namn": "Decidueye", "Setnr.": "11/149", "SetBet.": "SUM", "Set": "Sun & Moon (SUM)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.5, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 26, "Språk": "ENG", "Namn": "Decidueye", "Setnr.": "11/149", "SetBet.": "SUM", "Set": "Sun & Moon (SUM)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.5, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 27, "Språk": "ENG", "Namn": "Decidueye", "Setnr.": "SM55", "SetBet.": "SMP", "Set": "SM Black Star Promos", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 0.5, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 28, "Språk": "ENG", "Namn": "Mimikyu", "Setnr.": "58/145", "SetBet.": "GRI", "Set": "Guardians Rising (GRI)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 9.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 29, "Språk": "ENG", "Namn": "Mimikyu", "Setnr.": "58/145", "SetBet.": "GRI", "Set": "Guardians Rising (GRI)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 9.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 30, "Språk": "ENG", "Namn": "Mimikyu", "Setnr.": "58/145", "SetBet.": "GRI", "Set": "Guardians Rising (GRI)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 9.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 31, "Språk": "JPN", "Namn": "Mimikyu", "Setnr.": "010/026", "SetBet.": "smD", "Set": "Ash vs Team Rocket Deck Kit (smD)", "Övrigt": "", "Skick": "EX", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 200.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 32, "Språk": "ENG", "Namn": "Zeraora", "Setnr.": "60/214", "SetBet.": "UNB", "Set": "Unbroken Bonds (UNB)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 1.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 33, "Språk": "ENG", "Namn": "Zeraora GX", "Setnr.": "86/214", "SetBet.": "LOT", "Set": "Lost Thunder (LOT)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 7.0, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 34, "Språk": "JPN", "Namn": "Zeraora", "Setnr.": "055/193", "SetBet.": "m2a", "Set": "MEGA Dream ex (m2a)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 1.74, "Köpt för (SEK)": 20.0, "Värde (EUR)": 0.02, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 35, "Språk": "ENG", "Namn": "Gholdengo EX", "Setnr.": "139/182", "SetBet.": "PAR", "Set": "Paradox Rift (PAR)", "Övrigt": "", "Skick": "EX", "Köpt för (EUR)": 2.61, "Köpt för (SEK)": 30.0, "Värde (EUR)": 0.6, "Datum tillagd": "2026-08-21"},
+        {"Pärmnummer": 36, "Språk": "ENG", "Namn": "Gholdengo EX", "Setnr.": "231/182", "SetBet.": "PAR", "Set": "Paradox Rift (PAR)", "Övrigt": "", "Skick": "NM", "Köpt för (EUR)": 3.48, "Köpt för (SEK)": 40.0, "Värde (EUR)": 3.0, "Datum tillagd": "2026-08-21"}
+    ],
+    "sets_list": [
+        {"Maxnr": "111", "SetBet": "CIN", "Set": "Crimson Invasion (CIN)"},
+        {"Maxnr": "236", "SetBet": "UNM", "Set": "Unified Minds (UNM)"},
+        {"Maxnr": "214", "SetBet": "LOT", "Set": "Lost Thunder (LOT)"},
+        {"Maxnr": "131", "SetBet": "FLI", "Set": "Forbidden Light (FLI)"},
+        {"Maxnr": "156", "SetBet": "UPR", "Set": "Ultra Prism (UPR)"},
+        {"Maxnr": "149", "SetBet": "SUM", "Set": "Sun & Moon (SUM)"},
+        {"Maxnr": "145", "SetBet": "GRI", "Set": "Guardians Rising (GRI)"},
+        {"Maxnr": "182", "SetBet": "PAR", "Set": "Paradox Rift (PAR)"},
+        {"Maxnr": "12", "SetBet": "MCD16", "Set": "McDonald's Collection 2016 (MCD16)"},
+        {"Maxnr": "30", "SetBet": "TK10 A30", "Set": "SM Trainer Kit: Lycanroc & Alolan Raichu"},
+        {"Maxnr": "PROMO", "SetBet": "SMP", "Set": "SM Black Star Promos"},
+        {"Maxnr": "UNP", "SetBet": "UNP", "Set": "Unnumbered Promos (UNP)"},
+        {"Maxnr": "N1", "SetBet": "N1", "Set": "Gold, Silver, to a New World (N1)"},
+        {"Maxnr": "051", "SetBet": "BW8t", "Set": "Thunder Knuckle (BW8t)"},
+        {"Maxnr": "088", "SetBet": "XY4", "Set": "Phantom Gate (XY4)"},
+        {"Maxnr": "026", "SetBet": "smD", "Set": "Ash vs Team Rocket Deck Kit (smD)"},
+        {"Maxnr": "193", "SetBet": "m2a", "Set": "MEGA Dream ex (m2a)"}
+    ],
+    "languages": ["ENG", "JPN", "SWE", "GER"],
+    "names": [
+        "Alolan Raichu", "Togepi", "Togetic", "Ampharos", "Infernape", "Pachirisu",
+        "Dragalge", "Goodra", "Decidueye", "Mimikyu", "Zeraora", "Zeraora GX", "Gholdengo EX"
+    ],
+    "extra_options": ["Holo", "Reverse Holo", "Non-Holo", "1st ed", "1st Edition"]
+}
+
 def load_data_from_github():
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        return {"collection": [], "sets_list": [], "languages": ["ENG", "JPN", "SWE", "GER"], "names": ["Alolan Raichu", "Togepi"], "extra_options": ["Holo", "Reverse Holo"]}
+        return DEFAULT_DATA
     
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -28,16 +94,7 @@ def load_data_from_github():
     except Exception:
         pass
 
-    return {
-        "collection": [],
-        "sets_list": [
-            {"Maxnr": "111", "SetBet": "CIN", "Set": "Crimson Invasion (CIN)"},
-            {"Maxnr": "236", "SetBet": "UNM", "Set": "Unified Minds (UNM)"}
-        ],
-        "languages": ["ENG", "JPN", "SWE", "GER"],
-        "names": ["Alolan Raichu", "Togepi", "Togetic", "Ampharos", "Infernape", "Pachirisu"],
-        "extra_options": ["Holo", "Reverse Holo", "Non-Holo", "1st Edition"]
-    }
+    return DEFAULT_DATA
 
 def save_data_to_github(data_dict):
     if not GITHUB_TOKEN or not GITHUB_REPO:
@@ -66,13 +123,11 @@ def save_data_to_github(data_dict):
     if res_put.status_code not in [200, 201]:
         st.error(f"Kunde inte spara till GitHub: {res_put.text}")
 
-# --- INITIALISERA DATA ---
 if "app_data" not in st.session_state:
     st.session_state.app_data = load_data_from_github()
 
 app_data = st.session_state.app_data
 
-# --- HÄMTA VÄXELKURS ---
 @st.cache_data(ttl=86400)
 def get_eur_to_sek():
     try:
