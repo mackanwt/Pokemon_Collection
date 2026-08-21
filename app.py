@@ -149,6 +149,8 @@ tab1, tab2, tab3 = st.tabs(["📦 Samling", "⚙️ Hantera Listor & Sets", "➕
 # --- FLIK 1: HUVUDSAMLING ---
 with tab1:
     st.subheader("Min Samling")
+    st.caption("Klicka på valfri kolumnrubrik (t.ex. 'Namn', 'Pärmnummer' eller 'Värde (EUR)') för att sortera tabellen.")
+    
     collection_df = pd.DataFrame(app_data.get("collection", []))
     
     if not collection_df.empty:
@@ -161,10 +163,6 @@ with tab1:
             use_container_width=True,
             key="main_collection_editor",
             column_config={
-                "Skick": st.column_config.SelectboxColumn(options=["NM", "EX", "GD", "LP", "PL", "PO"]),
-                "Språk": st.column_config.SelectboxColumn(options=app_data["languages"]),
-                "Namn": st.column_config.SelectboxColumn(options=app_data["names"]),
-                "Övrigt": st.column_config.SelectboxColumn(options=app_data["extra_options"]),
                 "Köpt för (SEK)": st.column_config.NumberColumn(disabled=True),
                 "Värde idag (SEK)": st.column_config.NumberColumn(disabled=True),
             }
@@ -181,7 +179,7 @@ with tab1:
 # --- FLIK 2: INSTÄLLNINGAR & SETS ---
 with tab2:
     st.subheader("Redigera Sets")
-    st.caption("Klicka direkt i cellerna nedan för att ändra texten eller lägga till nya rader längst ner.")
+    st.caption("Klicka på en rubrik för att sortera, eller klicka i en cell för att ändra.")
     
     sets_df = pd.DataFrame(app_data.get("sets_list", []))
     edited_sets_df = st.data_editor(
@@ -199,7 +197,6 @@ with tab2:
 
     st.divider()
     
-    # Redigera namn, språk och extra alternativ
     col_names, col_langs, col_extra = st.columns(3)
     
     with col_names:
