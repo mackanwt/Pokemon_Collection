@@ -1,48 +1,88 @@
 import streamlit as st
 import pandas as pd
 import requests
+import json
+import base64
 from datetime import date
 
 st.set_page_config(page_title="Pokémon Samling", layout="wide")
 
-# --- HÄMTA VÄXELKURS (EUR -> SEK) ---
+# --- GITHUB INTEGRATION (SPARA OCH LÄS) ---
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
+GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
+FILE_PATH = "data.json"
+
+def load_data_from_github():
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        return {"collection": [], "sets_list": [], "languages": ["ENG", "JPN", "SWE", "GER"], "names": ["Alolan Raichu", "Togepi"], "extra_options": ["Holo", "Reverse Holo"]}
+    
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    
+    try:
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            content = res.json()["content"]
+            decoded_data = base64.b64decode(content).decode('utf-8')
+            return json.loads(decoded_data)
+    except Exception:
+        pass
+
+    return {
+        "collection": [],
+        "sets_list": [
+            {"Maxnr": "111", "SetBet": "CIN", "Set": "Crimson Invasion (CIN)"},
+            {"Maxnr": "236", "SetBet": "UNM", "Set": "Unified Minds (UNM)"}
+        ],
+        "languages": ["ENG", "JPN", "SWE", "GER"],
+        "names": ["Alolan Raichu", "Togepi", "Togetic", "Ampharos", "Infernape", "Pachirisu"],
+        "extra_options": ["Holo", "Reverse Holo", "Non-Holo", "1st Edition"]
+    }
+
+def save_data_to_github(data_dict):
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        st.error("Saknar GITHUB_TOKEN eller GITHUB_REPO i Secrets!")
+        return
+
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+
+    sha = None
+    res_get = requests.get(url, headers=headers)
+    if res_get.status_code == 200:
+        sha = res_get.json()["sha"]
+
+    json_str = json.dumps(data_dict, indent=4, ensure_ascii=False)
+    encoded_content = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+
+    payload = {
+        "message": "Uppdaterade samling/inställningar [via Streamlit]",
+        "content": encoded_content
+    }
+    if sha:
+        payload["sha"] = sha
+
+    res_put = requests.put(url, headers=headers, json=payload)
+    if res_put.status_code not in [200, 201]:
+        st.error(f"Kunde inte spara till GitHub: {res_put.text}")
+
+# --- INITIALISERA DATA ---
+if "app_data" not in st.session_state:
+    st.session_state.app_data = load_data_from_github()
+
+app_data = st.session_state.app_data
+
+# --- HÄMTA VÄXELKURS ---
 @st.cache_data(ttl=86400)
 def get_eur_to_sek():
     try:
         res = requests.get("https://open.er-api.com/v6/latest/EUR").json()
         return res["rates"]["SEK"]
-    except:
+    except Exception:
         return 11.50
 
 current_rate = get_eur_to_sek()
 
-# --- INITIALISERA SESSION STATE ---
-if "languages" not in st.session_state:
-    st.session_state.languages = ["ENG", "JPN", "SWE", "GER"]
-
-if "names" not in st.session_state:
-    st.session_state.names = ["Alolan Raichu", "Togepi", "Togetic", "Ampharos", "Infernape", "Pachirisu"]
-
-if "extra_options" not in st.session_state:
-    st.session_state.extra_options = ["Holo", "Reverse Holo", "Non-Holo", "1st Edition"]
-
-if "sets_list" not in st.session_state:
-    st.session_state.sets_list = [
-        {"Maxnr": "111", "SetBet": "CIN", "Set": "Crimson Invasion (CIN)"},
-        {"Maxnr": "236", "SetBet": "UNM", "Set": "Unified Minds (UNM)"},
-        {"Maxnr": "214", "SetBet": "LOT", "Set": "Lost Thunder (LOT)"},
-        {"Maxnr": "131", "SetBet": "FLI", "Set": "Forbidden Light (FLI)"},
-        {"Maxnr": "30", "SetBet": "TK10 A30", "Set": "SM Trainer Kit: Lycanroc & Alolan Raichu"},
-    ]
-
-if "collection" not in st.session_state:
-    st.session_state.collection = pd.DataFrame(columns=[
-        "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
-        "Övrigt", "Skick", "Köpt för (EUR)", "Köpt för (SEK)", 
-        "Värde (EUR)", "Värde idag (SEK)", "Datum tillagd"
-    ])
-
-# --- APP LAYOUT & FLIKAR ---
 st.title("🎴 Min Pokémon-samling")
 st.write(f"**Dagens växelkurs:** 1 EUR = **{current_rate:.2f} SEK**")
 
@@ -51,8 +91,10 @@ tab1, tab2, tab3 = st.tabs(["📦 Samling", "⚙️ Hantera Listor & Sets", "➕
 # --- FLIK 1: HUVUDSAMLING ---
 with tab1:
     st.subheader("Min Samling")
-    if not st.session_state.collection.empty:
-        df_display = st.session_state.collection.copy()
+    collection_df = pd.DataFrame(app_data.get("collection", []))
+    
+    if not collection_df.empty:
+        df_display = collection_df.copy()
         df_display["Värde idag (SEK)"] = (df_display["Värde (EUR)"] * current_rate).round(2)
         
         edited_df = st.data_editor(
@@ -61,127 +103,72 @@ with tab1:
             use_container_width=True,
             key="main_collection_editor",
             column_config={
-                "Skick": st.column_config.SelectboxColumn(
-                    options=["NM", "EX", "GD", "LP", "PL", "PO"]
-                ),
-                "Språk": st.column_config.SelectboxColumn(options=st.session_state.languages),
-                "Namn": st.column_config.SelectboxColumn(options=st.session_state.names),
-                "Övrigt": st.column_config.SelectboxColumn(options=st.session_state.extra_options),
-                "Köpt för (SEK)": st.column_config.NumberColumn(disabled=True, help="Låst till kursen dagen kortet lades till."),
-                "Värde idag (SEK)": st.column_config.NumberColumn(disabled=True, help="Uppdateras automatiskt varje dag."),
+                "Skick": st.column_config.SelectboxColumn(options=["NM", "EX", "GD", "LP", "PL", "PO"]),
+                "Språk": st.column_config.SelectboxColumn(options=app_data["languages"]),
+                "Namn": st.column_config.SelectboxColumn(options=app_data["names"]),
+                "Övrigt": st.column_config.SelectboxColumn(options=app_data["extra_options"]),
+                "Köpt för (SEK)": st.column_config.NumberColumn(disabled=True),
+                "Värde idag (SEK)": st.column_config.NumberColumn(disabled=True),
             }
         )
-        st.session_state.collection = edited_df
+        
+        if st.button("💾 Spara ändringar i tabellen", type="primary"):
+            app_data["collection"] = edited_df.to_dict(orient="records")
+            save_data_to_github(app_data)
+            st.success("Ändringar sparades till GitHub!")
+            st.rerun()
     else:
-        st.info("Samlingen är tom. Gå till fliken 'Lägg till Kort' för att börja!")
+        st.info("Samlingen är tom. Lägg till kort under fliken 'Lägg till Kort'.")
 
-# --- FLIK 2: INSTÄLLNINGAR & SET-MAPPING ---
+# --- FLIK 2: INSTÄLLNINGAR & SETS ---
 with tab2:
     st.subheader("Befintliga Sets")
-    
-    sets_df = pd.DataFrame(st.session_state.sets_list)
-    st.dataframe(sets_df, use_container_width=True)
+    st.dataframe(pd.DataFrame(app_data["sets_list"]), use_container_width=True)
 
     st.subheader("➕ Lägg till nytt Set")
-    with st.form("add_set_form_fixed", clear_on_submit=True):
-        col_s1, col_s2, col_s3 = st.columns(3)
-        with col_s1:
-            new_maxnr = st.text_input("Maxnr (t.ex. 111)")
-        with col_s2:
-            new_setbet = st.text_input("SetBet (t.ex. CIN)")
-        with col_s3:
-            new_setname = st.text_input("Fullt Set-namn (t.ex. Crimson Invasion)")
+    with st.form("add_set_form", clear_on_submit=True):
+        c1, c2, c3 = st.columns(3)
+        new_maxnr = c1.text_input("Maxnr (t.ex. 111)")
+        new_setbet = c2.text_input("SetBet (t.ex. CIN)")
+        new_setname = c3.text_input("Fullt Set-namn")
         
-        submit_set = st.form_submit_button("Spara nytt Set")
-        
-        if submit_set:
+        if st.form_submit_button("Spara nytt Set"):
             if new_maxnr and new_setbet:
-                st.session_state.sets_list.append({
+                app_data["sets_list"].append({
                     "Maxnr": new_maxnr.strip(),
                     "SetBet": new_setbet.strip(),
                     "Set": new_setname.strip()
                 })
+                save_data_to_github(app_data)
                 st.success(f"Sparade Set: {new_setbet}")
                 st.rerun()
-            else:
-                st.error("Du måste fylla i både Maxnr och SetBet!")
 
-    st.divider()
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.subheader("Språk")
-        st.write(", ".join(st.session_state.languages))
-        new_lang = st.text_input("Lägg till nytt språk", key="input_lang")
-        if st.button("➕ Lägg till språk") and new_lang:
-            if new_lang not in st.session_state.languages:
-                st.session_state.languages.append(new_lang)
-                st.rerun()
-
-    with col2:
-        st.subheader("Namn")
-        st.write(", ".join(st.session_state.names))
-        new_name = st.text_input("Lägg till nytt Pokémon-namn", key="input_name")
-        if st.button("➕ Lägg till namn") and new_name:
-            if new_name not in st.session_state.names:
-                st.session_state.names.append(new_name)
-                st.rerun()
-
-    with col3:
-        st.subheader("Övrigt")
-        st.write(", ".join(st.session_state.extra_options))
-        new_opt = st.text_input("Lägg till nytt val under Övrigt", key="input_opt")
-        if st.button("➕ Lägg till i Övrigt") and new_opt:
-            if new_opt not in st.session_state.extra_options:
-                st.session_state.extra_options.append(new_opt)
-                st.rerun()
-
-# --- FLIK 3: LÄGG TILL NYTT KORT ---
+# --- FLIK 3: LÄGG TILL KORT ---
 with tab3:
-    st.subheader("Lägg till ett nytt kort i samlingen")
+    st.subheader("Lägg till ett nytt kort")
     with st.form("add_card_form"):
         col_a, col_b, col_c = st.columns(3)
-        
         with col_a:
             parm = st.number_input("Pärmnummer", min_value=1, step=1)
-            sprak = st.selectbox("Språk", st.session_state.languages)
-            namn = st.selectbox("Namn", st.session_state.names)
+            sprak = st.selectbox("Språk", app_data["languages"])
+            namn = st.selectbox("Namn", app_data["names"])
             skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"])
             
         with col_b:
             setnr = st.text_input("Setnr. (t.ex. 12/111)", value="12/111")
-            
             max_nr = setnr.split("/")[-1].strip() if "/" in setnr else ""
-            all_sets = st.session_state.sets_list
-            matching_sets = [s for s in all_sets if str(s.get("Maxnr")).strip() == max_nr]
-            
-            if not matching_sets:
-                matching_sets = all_sets
-
-            setbet_options = [s["SetBet"] for s in matching_sets]
-            
-            selected_setbet = st.selectbox("SetBet.", setbet_options if setbet_options else ["-"])
-            
-            auto_set_name = ""
-            for s in all_sets:
-                if s.get("SetBet") == selected_setbet:
-                    auto_set_name = s.get("Set")
-                    break
-            
+            matching = [s for s in app_data["sets_list"] if str(s.get("Maxnr")).strip() == max_nr] or app_data["sets_list"]
+            selected_setbet = st.selectbox("SetBet.", [s["SetBet"] for s in matching])
+            auto_set_name = next((s.get("Set") for s in app_data["sets_list"] if s.get("SetBet") == selected_setbet), "")
             st.text_input("Set (Automatiskt)", value=auto_set_name, disabled=True)
 
         with col_c:
-            ovrigt = st.selectbox("Övrigt", st.session_state.extra_options)
+            ovrigt = st.selectbox("Övrigt", app_data["extra_options"])
             kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, step=0.5, format="%.2f")
             varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
         
-        submit = st.form_submit_button("Spara kort")
-        
-        if submit:
-            kopt_sek_fryst = round(kopt_eur * current_rate, 2)
-            varde_sek_idag = round(varde_eur * current_rate, 2)
-            
-            new_row = {
+        if st.form_submit_button("Spara kort", type="primary"):
+            new_card = {
                 "Pärmnummer": parm,
                 "Språk": sprak,
                 "Namn": namn,
@@ -191,18 +178,13 @@ with tab3:
                 "Övrigt": ovrigt,
                 "Skick": skick,
                 "Köpt för (EUR)": kopt_eur,
-                "Köpt för (SEK)": kopt_sek_fryst,
+                "Köpt för (SEK)": round(kopt_eur * current_rate, 2),
                 "Värde (EUR)": varde_eur,
-                "Värde idag (SEK)": varde_sek_idag,
+                "Värde idag (SEK)": round(varde_eur * current_rate, 2),
                 "Datum tillagd": date.today().strftime("%Y-%m-%d")
             }
             
-            # Lägg till i samlingen
-            st.session_state.collection = pd.concat([st.session_state.collection, pd.DataFrame([new_row])], ignore_index=True)
-            
-            # Tvinga data_editor att ladda om det nya innehållet
-            if "main_collection_editor" in st.session_state:
-                del st.session_state["main_collection_editor"]
-                
-            st.success(f"Kortet {namn} ({setnr}) har lagts till!")
+            app_data["collection"].append(new_card)
+            save_data_to_github(app_data)
+            st.success(f"Kortet {namn} sparades permanent till GitHub!")
             st.rerun()
