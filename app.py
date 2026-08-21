@@ -12,7 +12,7 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
 FILE_PATH = "data.json"
 
-# --- ALLA DINA 36 KORT OCH INSTÄLLNINGAR DIRECT I KODEN ---
+# --- DEFAULT DATA ---
 DEFAULT_DATA = {
     "collection": [
         {"Pärmnummer": 1, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "31/111", "SetBet.": "CIN", "Set": "Crimson Invasion (CIN)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 2.0, "Datum tillagd": "2026-08-21"},
@@ -92,7 +92,6 @@ def load_data_from_github():
             content = res.json()["content"]
             decoded_data = base64.b64decode(content).decode('utf-8')
             loaded = json.loads(decoded_data)
-            # Om filen på GitHub finns men har tom samling, använd DEFAULT_DATA istället
             if loaded.get("collection"):
                 return loaded
     except Exception:
@@ -127,7 +126,6 @@ def save_data_to_github(data_dict):
     if res_put.status_code not in [200, 201]:
         st.error(f"Kunde inte spara till GitHub: {res_put.text}")
 
-# Initialisera data
 if "app_data" not in st.session_state:
     st.session_state.app_data = load_data_from_github()
 
@@ -172,36 +170,67 @@ with tab1:
             }
         )
         
-        if st.button("💾 Spara ändringar i tabellen", type="primary"):
+        if st.button("💾 Spara ändringar i samlingen", type="primary"):
             app_data["collection"] = edited_df.to_dict(orient="records")
             save_data_to_github(app_data)
-            st.success("Ändringar sparades permanent!")
+            st.success("Samlingen sparades!")
             st.rerun()
     else:
         st.info("Samlingen är tom.")
 
 # --- FLIK 2: INSTÄLLNINGAR & SETS ---
 with tab2:
-    st.subheader("Befintliga Sets")
-    st.dataframe(pd.DataFrame(app_data["sets_list"]), use_container_width=True)
+    st.subheader("Redigera Sets")
+    st.caption("Klicka direkt i cellerna nedan för att ändra texten eller lägga till nya rader längst ner.")
+    
+    sets_df = pd.DataFrame(app_data.get("sets_list", []))
+    edited_sets_df = st.data_editor(
+        sets_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="sets_list_editor"
+    )
+    
+    if st.button("💾 Spara ändringar i Sets", type="primary"):
+        app_data["sets_list"] = edited_sets_df.to_dict(orient="records")
+        save_data_to_github(app_data)
+        st.success("Sets-listan uppdaterades!")
+        st.rerun()
 
-    st.subheader("➕ Lägg till nytt Set")
-    with st.form("add_set_form", clear_on_submit=True):
-        c1, c2, c3 = st.columns(3)
-        new_maxnr = c1.text_input("Maxnr (t.ex. 111)")
-        new_setbet = c2.text_input("SetBet (t.ex. CIN)")
-        new_setname = c3.text_input("Fullt Set-namn")
-        
-        if st.form_submit_button("Spara nytt Set"):
-            if new_maxnr and new_setbet:
-                app_data["sets_list"].append({
-                    "Maxnr": new_maxnr.strip(),
-                    "SetBet": new_setbet.strip(),
-                    "Set": new_setname.strip()
-                })
-                save_data_to_github(app_data)
-                st.success(f"Sparade Set: {new_setbet}")
-                st.rerun()
+    st.divider()
+    
+    # Redigera namn, språk och extra alternativ
+    col_names, col_langs, col_extra = st.columns(3)
+    
+    with col_names:
+        st.subheader("Pokémon-namn")
+        names_df = pd.DataFrame({"Namn": app_data.get("names", [])})
+        edited_names_df = st.data_editor(names_df, num_rows="dynamic", use_container_width=True, key="names_editor")
+        if st.button("Spara Namn"):
+            app_data["names"] = edited_names_df["Namn"].dropna().tolist()
+            save_data_to_github(app_data)
+            st.success("Namn-listan sparad!")
+            st.rerun()
+
+    with col_langs:
+        st.subheader("Språk")
+        langs_df = pd.DataFrame({"Språk": app_data.get("languages", [])})
+        edited_langs_df = st.data_editor(langs_df, num_rows="dynamic", use_container_width=True, key="langs_editor")
+        if st.button("Spara Språk"):
+            app_data["languages"] = edited_langs_df["Språk"].dropna().tolist()
+            save_data_to_github(app_data)
+            st.success("Språk-listan sparad!")
+            st.rerun()
+
+    with col_extra:
+        st.subheader("Övrigt-val")
+        extra_df = pd.DataFrame({"Övrigt": app_data.get("extra_options", [])})
+        edited_extra_df = st.data_editor(extra_df, num_rows="dynamic", use_container_width=True, key="extra_editor")
+        if st.button("Spara Övrigt-val"):
+            app_data["extra_options"] = edited_extra_df["Övrigt"].dropna().tolist()
+            save_data_to_github(app_data)
+            st.success("Övrigt-listan sparad!")
+            st.rerun()
 
 # --- FLIK 3: LÄGG TILL KORT ---
 with tab3:
