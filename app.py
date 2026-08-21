@@ -151,7 +151,6 @@ with tab3:
         with col_b:
             setnr = st.text_input("Setnr. (t.ex. 12/111)", value="12/111")
             
-            # Korrigerad referens till session_state
             max_nr = setnr.split("/")[-1].strip() if "/" in setnr else ""
             all_sets = st.session_state.sets_list
             matching_sets = [s for s in all_sets if str(s.get("Maxnr")).strip() == max_nr]
@@ -198,5 +197,12 @@ with tab3:
                 "Datum tillagd": date.today().strftime("%Y-%m-%d")
             }
             
+            # Lägg till i samlingen
             st.session_state.collection = pd.concat([st.session_state.collection, pd.DataFrame([new_row])], ignore_index=True)
+            
+            # Tvinga data_editor att ladda om det nya innehållet
+            if "main_collection_editor" in st.session_state:
+                del st.session_state["main_collection_editor"]
+                
             st.success(f"Kortet {namn} ({setnr}) har lagts till!")
+            st.rerun()
