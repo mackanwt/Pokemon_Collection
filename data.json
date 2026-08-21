@@ -1,51 +1,13 @@
 {
-    "collection": [
-        {
-            "Pärmnummer": 1,
-            "Språk": "ENG",
-            "Namn": "Alolan Raichu",
-            "Setnr.": "31/111",
-            "SetBet.": "CIN",
-            "Set": "Crimson Invasion (CIN)",
-            "Övrigt": "Holo",
-            "Skick": "NM",
-            "Köpt för (EUR)": 0.0,
-            "Köpt för (SEK)": 0.0,
-            "Värde (EUR)": 2.0,
-            "Värde idag (SEK)": 22.16,
-            "Datum tillagd": "2026-08-21"
-        }
-    ],
+    "collection": [],
     "sets_list": [
-        {
-            "Maxnr": "111",
-            "SetBet": "CIN",
-            "Set": "Crimson Invasion (CIN)"
-        },
-        {
-            "Maxnr": "236",
-            "SetBet": "UNM",
-            "Set": "Unified Minds (UNM)"
-        }
+        {"Maxnr": "111", "SetBet": "CIN", "Set": "Crimson Invasion (CIN)"},
+        {"Maxnr": "236", "SetBet": "UNM", "Set": "Unified Minds (UNM)"}
     ],
-    "languages": [
-        "ENG",
-        "JPN",
-        "SWE",
-        "GER"
-    ],
+    "languages": ["ENG", "JPN", "SWE", "GER"],
     "names": [
-        "Alolan Raichu",
-        "Togepi",
-        "Togetic",
-        "Ampharos",
-        "Infernape",
-        "Pachirisu"
+        "Alolan Raichu", "Togepi", "Togetic", "Ampharos", "Infernape", "Pachirisu",
+        "Dragalge", "Goodra", "Decidueye", "Mimikyu", "Zeraora", "Zeraora GX", "Gholdengo EX"
     ],
-    "extra_options": [
-        "Holo",
-        "Reverse Holo",
-        "Non-Holo",
-        "1st Edition"
-    ]
+    "extra_options": ["Holo", "Reverse Holo", "Non-Holo", "1st ed", "1st Edition"]
 }
