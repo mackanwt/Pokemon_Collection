@@ -6,9 +6,8 @@ import requests
 from datetime import date
 from PIL import Image, ImageOps
 import io
-import streamlit.components.v1 as components
 
-# --- 0. MOBILAPP- & PAGE-KONFIGURATION ---
+# --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
     page_title="Pokémon Samling", 
     page_icon="🎴",
@@ -36,15 +35,11 @@ manifest_base64 = base64.b64encode(manifest_json.encode('utf-8')).decode('utf-8'
 manifest_href = f"data:application/manifest+json;base64,{manifest_base64}"
 
 st.markdown(f"""
-    <!-- Web App Manifest för Android -->
     <link rel="manifest" href="{manifest_href}">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#ffffff">
-
-    <!-- Ikoner fallback -->
     <link rel="icon" type="image/png" sizes="192x192" href="{APP_ICON_URL}">
     <link rel="shortcut icon" href="{APP_ICON_URL}">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
     <style>
@@ -57,61 +52,8 @@ st.markdown(f"""
         button, input, select {{
             touch-action: manipulation;
         }}
-        
-        [data-testid="stHeader"] button,
-        div[role="columnheader"] {{
-            pointer-events: none !important;
-            touch-action: none !important;
-            user-select: none !important;
-        }}
-        
-        div[role="columnheader"] [data-testid="stTableSortIcon"] {{
-            pointer-events: auto !important;
-        }}
     </style>
 """, unsafe_allow_html=True)
-
-# --- NATIVE MOBILKAMERA-KOMPONENT ---
-def mobile_camera_input(key):
-    """En garanterad mobil-kameraknapp som alltid anropar mobilens kamera"""
-    html_code = f"""
-    <div style="font-family: sans-serif; text-align: center;">
-        <label for="cam_input_{key}" style="
-            background-color: #ff4b4b;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            display: inline-block;
-            font-weight: bold;
-            width: 90%;
-            box-sizing: border-box;
-        ">
-            📷 Öppna Kameran / Välj Bild
-        </label>
-        <input type="file" id="cam_input_{key}" accept="image/*" capture="environment" style="display:none;" onchange="loadFile(event)">
-        <p id="status_{key}" style="margin-top: 8px; font-size: 12px; color: #666;"></p>
-    </div>
-
-    <script>
-    function loadFile(event) {{
-        const file = event.target.files[0];
-        if (file) {{
-            document.getElementById('status_{key}').innerText = "Bild vald! Spara ändringar nedan.";
-            const reader = new FileReader();
-            reader.onload = function(e) {{
-                const imgData = e.target.result;
-                window.parent.postMessage({{
-                    type: 'streamlit:setComponentValue',
-                    value: imgData
-                }}, '*');
-            }};
-            reader.readAsDataURL(file);
-        }}
-    }}
-    </script>
-    """
-    return components.html(html_code, height=90)
 
 # --- GITHUB INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
@@ -153,27 +95,26 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# SÄKER BILDHANTERING MED AUTOMATISK KOMPRIMERING
-def process_uploaded_image(raw_str):
-    if not raw_str:
+# AUTOMATISK KOMPRIMERING OCH SKALNING AV HÖGUPPLÖSTA BILDER
+def process_uploaded_image(file_buffer):
+    if file_buffer is None:
         return ""
     
     try:
-        if "," in raw_str:
-            base64_data = raw_str.split(",")[1]
-        else:
-            base64_data = raw_str
-            
-        img_bytes = base64.b64decode(base64_data)
-        img = Image.open(io.BytesIO(img_bytes))
+        # Läs in filen (oavsett storlek)
+        bytes_data = file_buffer.getvalue()
+        img = Image.open(io.BytesIO(bytes_data))
         
+        # Rätta till bildrotation från mobilen
         img = ImageOps.exif_transpose(img)
         
         if img.mode != "RGB":
             img = img.convert("RGB")
             
+        # Skala ner högupplösta mobilbilder till max 600x800 px för snabb laddning
         img.thumbnail((600, 800), Image.Resampling.LANCZOS)
         
+        # Komprimera kraftigt (JPEG 70% kvalitet)
         buffered = io.BytesIO()
         img.save(buffered, format="JPEG", quality=70, optimize=True)
         img_str = base64.b64encode(buffered.getvalue()).decode()
@@ -219,11 +160,11 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    # Kör den egna mobilkameran
-    cam_data = mobile_camera_input(key=f"dialog_cam_{selected_index}")
+    # Använd Streamlits officiella kamerasökare
+    cam_file = st.camera_input("📷 Ta ett foto på kortet", key=f"dialog_cam_{selected_index}")
     
-    if cam_data:
-        new_img_str = process_uploaded_image(cam_data)
+    if cam_file:
+        new_img_str = process_uploaded_image(cam_file)
         if new_img_str:
             if st.button("💾 Spara bild", type="primary", use_container_width=True):
                 app_data["collection"][selected_index]["Bild"] = new_img_str
@@ -390,8 +331,8 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    new_cam_data = mobile_camera_input(key="add_new_cam")
-    final_img_str = process_uploaded_image(new_cam_data) if new_cam_data else ""
+    cam_file = st.camera_input("📷 Ta ett foto på kortet", key="add_new_cam")
+    final_img_str = process_uploaded_image(cam_file) if cam_file else ""
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
