@@ -34,6 +34,7 @@ manifest_json = json.dumps(manifest_data)
 manifest_base64 = base64.b64encode(manifest_json.encode('utf-8')).decode('utf-8')
 manifest_href = f"data:application/manifest+json;base64,{manifest_base64}"
 
+# Global CSS för att tvinga mobilen att ALDRIG beskära bilder samt anpassa dialogrutor för mobil
 st.markdown(f"""
     <link rel="manifest" href="{manifest_href}">
     <meta name="mobile-web-app-capable" content="yes">
@@ -46,11 +47,23 @@ st.markdown(f"""
         .main .block-container {{
             padding-top: 1rem;
             padding-bottom: 2rem;
-            padding-left: 0.8rem;
-            padding-right: 0.8rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
         }}
         button, input, select {{
             touch-action: manipulation;
+        }}
+        /* Tvinga alla Streamlit-bilder på mobil att behålla bildförhållandet utan beskärning */
+        div[data-testid="stImage"] img {{
+            object-fit: contain !important;
+            max-height: 80vh !important;
+            width: 100% !important;
+        }}
+        /* Gör dialogrutan mer mobilvänlig */
+        div[role="dialog"] {{
+            width: 95vw !important;
+            max-width: 100vw !important;
+            padding: 0.5rem !important;
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -67,10 +80,10 @@ def process_pil_image(img, rotate_degrees=0):
             img = img.rotate(-rotate_degrees, expand=True)
 
         img = img.convert("RGB")
-        img.thumbnail((600, 600))
+        img.thumbnail((800, 800))
         
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=75)
+        img.save(buffered, format="JPEG", quality=80)
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
         return f"data:image/jpeg;base64,{img_str}"
     except Exception as e:
@@ -155,23 +168,7 @@ if not app_data:
 
 current_rate = 11.5
 
-# DIALOGRUTA FÖR FULLSTÄNDIG BILD
-@st.dialog("🔍 Förstorad Bild")
-def show_large_image_dialog(card_data):
-    st.markdown(f"### {card_data.get('Namn', '')}")
-    raw_img = card_data.get("Bild", "")
-    if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
-        try:
-            if raw_img.startswith("data:image"):
-                base64_data = raw_img.split(",")[1]
-                img_bytes = base64.b64decode(base64_data)
-                st.image(Image.open(io.BytesIO(img_bytes)), use_container_width=True)
-            else:
-                st.image(raw_img, use_container_width=True)
-        except Exception:
-            st.error("Kunde inte visa bilden.")
-
-# DIALOGRUTA FÖR BILDER MED ROTERING OCH FÖRSTORING
+# DIALOGRUTA FÖR BILDER MED ROTERING
 @st.dialog("🎴 Kortdetaljer & Välj bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -197,7 +194,7 @@ def show_card_dialog(selected_index, card_data):
             current_rot = st.session_state[rot_key]
             preview_img = pil_img.rotate(-current_rot, expand=True) if current_rot != 0 else pil_img
             
-            st.image(preview_img, width=220, caption=f"Förhandsvisning (Rotation: {current_rot}°)")
+            st.image(preview_img, caption=f"Förhandsvisning (Rotation: {current_rot}°)")
             
             if st.button("💾 Spara denna bild på kortet", type="primary", use_container_width=True):
                 img_b64 = process_pil_image(pil_img, rotate_degrees=current_rot)
@@ -220,12 +217,9 @@ def show_card_dialog(selected_index, card_data):
                 if raw_img.startswith("data:image"):
                     base64_data = raw_img.split(",")[1]
                     img_bytes = base64.b64decode(base64_data)
-                    st.image(Image.open(io.BytesIO(img_bytes)), width=220, caption="Nuvarande sparad bild")
+                    st.image(Image.open(io.BytesIO(img_bytes)), caption="Nuvarande sparad bild")
                 else:
-                    st.image(raw_img, width=220, caption="Nuvarande sparad bild")
-                
-                if st.button("🔍 Förstora bilden utan beskärning", use_container_width=True):
-                    show_large_image_dialog(card_data)
+                    st.image(raw_img, caption="Nuvarande sparad bild")
             except Exception:
                 st.info("Ingen bild finns sparad för detta kort ännu.")
         else:
@@ -283,6 +277,26 @@ with tab1:
             "Datum tillagd": st.column_config.TextColumn("Datum", width="small"),
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
+
+        # BILDVISARE FÖR MOBIL (Säkerställer full bildvisning utan modal-begränsningar)
+        with st.expander("🔎 Klicka här för att förstora ett kort (Mobilanpassat)", expanded=False):
+            card_names = [f"Rad {i+1}: {c.get('Namn', '')} ({c.get('Setnr.', '')})" for i, c in enumerate(app_data.get("collection", []))]
+            if card_names:
+                selected_card_idx = st.selectbox("Välj kort att titta på:", range(len(card_names)), format_func=lambda x: card_names[x])
+                card_item = app_data["collection"][selected_card_idx]
+                raw_img = card_item.get("Bild", "")
+                if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
+                    try:
+                        if raw_img.startswith("data:image"):
+                            base64_data = raw_img.split(",")[1]
+                            img_bytes = base64.b64decode(base64_data)
+                            st.image(Image.open(io.BytesIO(img_bytes)), caption=f"{card_item.get('Namn')} - {card_item.get('Set')}")
+                        else:
+                            st.image(raw_img, caption=f"{card_item.get('Namn')} - {card_item.get('Set')}")
+                    except Exception:
+                        st.error("Kunde inte ladda bilden.")
+                else:
+                    st.info("Detta kort har ingen bild sparad ännu.")
 
         edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
@@ -426,7 +440,7 @@ with tab3:
 
             cur_rot = st.session_state["new_card_rotation"]
             preview_new = pil_img_new.rotate(-cur_rot, expand=True) if cur_rot != 0 else pil_img_new
-            st.image(preview_new, width=200, caption=f"Förhandsvisning (Rotation: {cur_rot}°)")
+            st.image(preview_new, caption=f"Förhandsvisning (Rotation: {cur_rot}°)")
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
