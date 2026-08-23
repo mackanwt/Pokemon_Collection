@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
-import requests
 import json
 import base64
+import requests
 from datetime import date
 from PIL import Image
 import io
@@ -15,10 +15,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Ikon-URL för din Android-app (PNG-bild)
 APP_ICON_URL = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3b4.png"
 
-# Manifest-konfiguration för Android Chrome
 manifest_data = {
     "name": "Pokémon Samling",
     "short_name": "Pokémon",
@@ -27,20 +25,11 @@ manifest_data = {
     "background_color": "#ffffff",
     "theme_color": "#ffffff",
     "icons": [
-        {
-            "src": APP_ICON_URL,
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": APP_ICON_URL,
-            "sizes": "512x512",
-            "type": "image/png"
-        }
+        {"src": APP_ICON_URL, "sizes": "192x192", "type": "image/png"},
+        {"src": APP_ICON_URL, "sizes": "512x512", "type": "image/png"}
     ]
 }
 
-# Omvandla manifest till Data-URI för Android
 manifest_json = json.dumps(manifest_data)
 manifest_base64 = base64.b64encode(manifest_json.encode('utf-8')).decode('utf-8')
 manifest_href = f"data:application/manifest+json;base64,{manifest_base64}"
@@ -68,7 +57,7 @@ st.markdown(f"""
             touch-action: manipulation;
         }}
         
-        /* Lås kolumnrubriker så de inte går att flytta på mobilen */
+        /* Lås kolumnrubriker så de inte flyttas av misstag på mobilen */
         [data-testid="stHeader"] button,
         div[role="columnheader"] {{
             pointer-events: none !important;
@@ -76,7 +65,6 @@ st.markdown(f"""
             user-select: none !important;
         }}
         
-        /* Tillåt fortfarande klick på sorteringspilar */
         div[role="columnheader"] [data-testid="stTableSortIcon"] {{
             pointer-events: auto !important;
         }}
@@ -88,115 +76,94 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
 FILE_PATH = "data.json"
 
-# --- DEFAULT DATA ---
-DEFAULT_DATA = {
-    "collection": [
-        {"Bild": "", "Pärmnummer": 1, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "31/111", "SetBet.": "CIN", "Set": "Crimson Invasion (CIN)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 2.0, "Datum tillagd": "2026-08-21"},
-        {"Bild": "", "Pärmnummer": 2, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "31/111", "SetBet.": "CIN", "Set": "Crimson Invasion (CIN)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 2.0, "Datum tillagd": "2026-08-21"},
-        {"Bild": "", "Pärmnummer": 3, "Språk": "ENG", "Namn": "Alolan Raichu", "Setnr.": "57/236", "SetBet.": "UNM", "Set": "Unified Minds (UNM)", "Övrigt": "Holo", "Skick": "NM", "Köpt för (EUR)": 0.0, "Köpt för (SEK)": 0.0, "Värde (EUR)": 6.0, "Datum tillagd": "2026-08-21"}
-    ],
-    "sets_list": [
-        {"Maxnr": "111", "SetBet": "CIN", "Set": "Crimson Invasion (CIN)"},
-        {"Maxnr": "236", "SetBet": "UNM", "Set": "Unified Minds (UNM)"}
-    ],
-    "languages": ["ENG", "JPN", "SWE", "GER"],
-    "names": ["Alolan Raichu", "Togepi"],
-    "extra_options": ["Holo", "Reverse Holo", "Non-Holo"]
-}
-
 def load_data_from_github():
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        return DEFAULT_DATA
-    
+        return None
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    
-    try:
-        res = requests.get(url, headers=headers)
-        if res.status_code == 200:
-            content = res.json()["content"]
-            decoded_data = base64.b64decode(content).decode('utf-8')
-            loaded = json.loads(decoded_data)
-            if loaded.get("collection"):
-                return loaded
-    except Exception:
-        pass
-
-    return DEFAULT_DATA
+    res = requests.get(url, headers=headers)
+    if res.status_code == 200:
+        content = base64.b64decode(res.json()["content"]).decode('utf-8')
+        return json.loads(content)
+    return None
 
 def save_data_to_github(data_dict):
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        st.warning("GITHUB_TOKEN eller GITHUB_REPO saknas i Secrets.")
-        return
-
+        return False
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-
-    sha = None
-    res_get = requests.get(url, headers=headers)
-    if res_get.status_code == 200:
-        sha = res_get.json()["sha"]
-
-    json_str = json.dumps(data_dict, indent=4, ensure_ascii=False)
-    encoded_content = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
-
+    res = requests.get(url, headers=headers)
+    sha = res.json()["sha"] if res.status_code == 200 else None
+    
+    content_str = json.dumps(data_dict, indent=2, ensure_ascii=False)
+    encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
+    
     payload = {
-        "message": "Uppdaterade samling [via Streamlit]",
+        "message": "Uppdaterade samlingsdata",
         "content": encoded_content
     }
     if sha:
         payload["sha"] = sha
-
-    res_put = requests.put(url, headers=headers, json=payload)
-    if res_put.status_code not in [200, 201]:
-        st.error(f"Kunde inte spara till GitHub: {res_put.text}")
+        
+    put_res = requests.put(url, json=payload, headers=headers)
+    return put_res.status_code in [200, 201]
 
 def process_uploaded_image(file_buffer):
-    if not file_buffer:
+    if file_buffer is None:
         return ""
     img = Image.open(file_buffer)
-    img.thumbnail((600, 800))
+    img.thumbnail((300, 300))
     buffered = io.BytesIO()
-    img.save(buffered, format="JPEG", quality=75)
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    img.save(buffered, format="JPEG", quality=70)
+    img_str = base64.b64encode(buffered.getvalue()).decode()
     return f"data:image/jpeg;base64,{img_str}"
 
-if "app_data" not in st.session_state:
-    st.session_state.app_data = load_data_from_github()
+# Ladda data från GitHub eller sätt standard
+app_data = load_data_from_github()
+if not app_data:
+    app_data = {
+        "collection": [],
+        "languages": ["ENG", "JAP", "SWE"],
+        "names": ["Alolan Raichu", "Pikachu", "Charizard"],
+        "extra_options": ["Normal", "Holo", "Reverse Holo", "Secret Rare"],
+        "sets_list": [{"SetBet": "CIN", "Set": "Crimson Invasion (CIN)", "Maxnr": "111"}]
+    }
 
-app_data = st.session_state.app_data
+current_rate = 11.5  # EUR till SEK växelkurs
 
-@st.cache_data(ttl=86400)
-def get_eur_to_sek():
-    try:
-        res = requests.get("https://open.er-api.com/v6/latest/EUR").json()
-        return res["rates"]["SEK"]
-    except Exception:
-        return 11.50
+# --- DIALOGRUTA FÖR ATT SKANNA BILD DIREKT PÅ EN RAD ---
+@st.dialog("📷 Ändra / Skanna bild på kort")
+def show_card_dialog(selected_index, card_data):
+    st.write(f"**Valt kort:** {card_data.get('Namn', '')} ({card_data.get('SetBet.', '')} {card_data.get('Setnr.', '')})")
+    
+    if card_data.get("Bild"):
+        st.image(card_data["Bild"], caption="Nuvarande bild", width=150)
+    
+    st.divider()
+    
+    cam_img = st.camera_input("📷 Ta nytt foto med mobilkameran")
+    file_img = st.file_uploader("Eller välj från mobilens galleri", type=["png", "jpg", "jpeg"])
+    
+    new_img_str = ""
+    if cam_img:
+        new_img_str = process_uploaded_image(cam_img)
+    elif file_img:
+        new_img_str = process_uploaded_image(file_img)
+        
+    if new_img_str:
+        if st.button("💾 Spara bild på detta kort", type="primary", use_container_width=True):
+            app_data["collection"][selected_index]["Bild"] = new_img_str
+            save_data_to_github(app_data)
+            st.success("Bilden sparades i samlingen!")
+            st.rerun()
 
-current_rate = get_eur_to_sek()
+# --- HUVUDLAYOUT ---
+tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till / Skanna"])
 
-st.title("🎴 Min Pokémon-samling")
-st.write(f"**Dagens växelkurs:** 1 EUR = **{current_rate:.2f} SEK**")
-
-tab1, tab2, tab3 = st.tabs(["📦 Samling", "⚙️ Hantera Listor & Sets", "➕ Lägg till / Skanna Kort"])
-
-# Pop-up ruta för att förstora bilden vid dubbelklick/val
-@st.dialog("🎴 Kortvisare")
-def show_card_dialog(row):
-    img_src = row.get("Bild", "")
-    if img_src and str(img_src).strip() != "":
-        st.image(img_src, use_column_width=True)
-    else:
-        st.info("Ingen bild finns skannad för detta kort.")
-    st.markdown(f"### {row['Namn']}")
-    st.write(f"**Set:** {row['Set']} ({row['Setnr.']})")
-    st.write(f"**Skick:** {row['Skick']} | **Språk:** {row['Språk']}")
-    st.write(f"**Värde idag:** {row['Värde idag (SEK)']} kr ({row['Värde (EUR)']} EUR)")
-
-# --- FLIK 1: HUVUDSAMLING ---
+# --- FLIK 1: HUVUDSAMLING & SKANNA DIREKT I TABELLEN ---
 with tab1:
     st.subheader("Min Samling")
+    st.caption("💡 *Klicka/tryck på valfri rad för att öppna kameran och skanna/ändra bild för det kortet.*")
     
     collection_df = pd.DataFrame(app_data.get("collection", []))
     
@@ -206,7 +173,6 @@ with tab1:
 
         df_display = collection_df.copy()
         
-        # Konvertera datatyper säkert för Streamlit
         df_display["Värde (EUR)"] = pd.to_numeric(df_display["Värde (EUR)"], errors='coerce').fillna(0.0)
         df_display["Köpt för (EUR)"] = pd.to_numeric(df_display["Köpt för (EUR)"], errors='coerce').fillna(0.0)
         df_display["Köpt för (SEK)"] = pd.to_numeric(df_display["Köpt för (SEK)"], errors='coerce').fillna(0.0)
@@ -218,7 +184,6 @@ with tab1:
             "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
         ]
         
-        # Bas-konfiguration för tabellvisning
         column_config = {
             "Bild": st.column_config.ImageColumn("Bild", width="small"),
             "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
@@ -236,42 +201,21 @@ with tab1:
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
 
-        edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
-        
-        if edit_mode:
-            # Skapa en helt säker konfiguration för data_editor (ändrar Bild till TextColumn)
-            editable_config = column_config.copy()
-            editable_config["Bild"] = st.column_config.TextColumn("Bild (URL/Base64)", width="small")
-            
-            edited_df = st.data_editor(
-                df_display,
-                column_order=columns_order,
-                column_config=editable_config,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="main_collection_editor"
-            )
-            
-            if st.button("💾 Spara ändringar i samlingen", type="primary"):
-                app_data["collection"] = edited_df.to_dict(orient="records")
-                save_data_to_github(app_data)
-                st.success("Samlingen sparades!")
-                st.rerun()
-        else:
-            event = st.dataframe(
-                df_display,
-                column_order=columns_order,
-                column_config=column_config,
-                use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row"
-            )
+        event = st.dataframe(
+            df_display,
+            column_order=columns_order,
+            column_config=column_config,
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row"
+        )
 
-            if event and event.selection and event.selection.rows:
-                selected_idx = event.selection.rows[0]
-                selected_row = df_display.iloc[selected_idx]
-                show_card_dialog(selected_row)
+        # När du trycker på en rad öppnas skannern för den raden!
+        if event and event.selection and event.selection.rows:
+            selected_idx = event.selection.rows[0]
+            selected_row = df_display.iloc[selected_idx]
+            show_card_dialog(selected_idx, selected_row)
 
         total_value_sek = df_display["Värde idag (SEK)"].sum()
         total_cost_sek = df_display["Köpt för (SEK)"].sum()
@@ -283,79 +227,64 @@ with tab1:
             st.metric("Totalt värde (SEK)", f"{total_value_sek:,.2f} kr")
         with col_profit:
             st.metric("Total vinst (SEK)", f"{total_profit_sek:,.2f} kr", delta=f"{total_profit_sek:,.2f} kr")
-
     else:
         st.info("Samlingen är tom.")
 
-# --- FLIK 2: INSTÄLLNINGAR & SETS ---
+# --- FLIK 2: REDIGERINGSLÄGE FÖR TEXT/DATA ---
 with tab2:
-    st.subheader("Redigera Sets")
-    sets_df = pd.DataFrame(app_data.get("sets_list", []))
-    edited_sets_df = st.data_editor(
-        sets_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="sets_list_editor"
-    )
+    st.subheader("✏️ Massredigera text och värden")
+    collection_df = pd.DataFrame(app_data.get("collection", []))
     
-    if st.button("💾 Spara ändringar i Sets", type="primary"):
-        app_data["sets_list"] = edited_sets_df.to_dict(orient="records")
-        save_data_to_github(app_data)
-        st.success("Sets-listan uppdaterades!")
-        st.rerun()
+    if not collection_df.empty:
+        df_display = collection_df.copy()
+        columns_order = [
+            "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
+            "Övrigt", "Skick", "Köpt för (EUR)", "Köpt för (SEK)", 
+            "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
+        ]
+        
+        editable_config = {
+            "Bild": st.column_config.TextColumn("Bild (URL/Base64)", width="small"),
+            "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
+            "Språk": st.column_config.TextColumn("Språk", width="small"),
+            "Namn": st.column_config.TextColumn("Namn", width="medium"),
+            "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
+            "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
+            "Set": st.column_config.TextColumn("Set", width="large"),
+            "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
+            "Skick": st.column_config.TextColumn("Skick", width="small"),
+            "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", width="small", format="%.2f"),
+            "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
+        }
 
-    st.divider()
-    
-    col_names, col_langs, col_extra = st.columns(3)
-    
-    with col_names:
-        st.subheader("Pokémon-namn")
-        names_df = pd.DataFrame({"Namn": app_data.get("names", [])})
-        edited_names_df = st.data_editor(names_df, num_rows="dynamic", use_container_width=True, key="names_editor")
-        if st.button("Spara Namn"):
-            app_data["names"] = edited_names_df["Namn"].dropna().tolist()
+        edited_df = st.data_editor(
+            df_display,
+            column_order=columns_order,
+            column_config=editable_config,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="text_editor_grid"
+        )
+        
+        if st.button("💾 Spara alla textändringar till GitHub", type="primary"):
+            app_data["collection"] = edited_df.to_dict(orient="records")
             save_data_to_github(app_data)
-            st.success("Namn-listan sparad!")
+            st.success("Samlingen sparades!")
             st.rerun()
 
-    with col_langs:
-        st.subheader("Språk")
-        langs_df = pd.DataFrame({"Språk": app_data.get("languages", [])})
-        edited_langs_df = st.data_editor(langs_df, num_rows="dynamic", use_container_width=True, key="langs_editor")
-        if st.button("Spara Språk"):
-            app_data["languages"] = edited_langs_df["Språk"].dropna().tolist()
-            save_data_to_github(app_data)
-            st.success("Språk-listan sparad!")
-            st.rerun()
-
-    with col_extra:
-        st.subheader("Övrigt-val")
-        extra_df = pd.DataFrame({"Övrigt": app_data.get("extra_options", [])})
-        edited_extra_df = st.data_editor(extra_df, num_rows="dynamic", use_container_width=True, key="extra_editor")
-        if st.button("Spara Övrigt-val"):
-            app_data["extra_options"] = edited_extra_df["Övrigt"].dropna().tolist()
-            save_data_to_github(app_data)
-            st.success("Övrigt-listan sparad!")
-            st.rerun()
-
-# --- FLIK 3: LÄGG TILL / SKANNA KORT ---
+# --- FLIK 3: LÄGG TILL NYTT KORT ---
 with tab3:
-    st.subheader("📷 Skanna / Ta bild & Lägg till kort")
-    
-    cam_image = st.camera_input("Ta foto på kortet med mobilkameran")
-    file_image = st.file_uploader("Eller välj bild från mobilen/datorn", type=["png", "jpg", "jpeg"])
+    st.subheader("➕ Lägg till nytt kort")
+    cam_image = st.camera_input("📷 Ta foto på det nya kortet")
+    file_image = st.file_uploader("Eller välj bild från mobilen", type=["png", "jpg", "jpeg"])
     
     final_img_str = ""
     if cam_image:
         final_img_str = process_uploaded_image(cam_image)
-        st.success("Foto taget!")
     elif file_image:
         final_img_str = process_uploaded_image(file_image)
-        st.success("Bild uppladdad!")
 
-    st.divider()
-
-    with st.form("add_card_form"):
+    with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
         with col_a:
             parm = st.number_input("Pärmnummer", min_value=1, step=1)
@@ -376,7 +305,7 @@ with tab3:
             kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, step=0.5, format="%.2f")
             varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
         
-        if st.form_submit_button("Spara kort", type="primary"):
+        if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
             new_card = {
                 "Bild": final_img_str,
                 "Pärmnummer": parm,
@@ -396,5 +325,5 @@ with tab3:
             
             app_data["collection"].append(new_card)
             save_data_to_github(app_data)
-            st.success(f"Kortet {namn} sparades!")
+            st.success(f"Kortet {namn} skapades och sparades!")
             st.rerun()
