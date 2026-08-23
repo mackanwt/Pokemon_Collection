@@ -57,7 +57,6 @@ st.markdown(f"""
             touch-action: manipulation;
         }}
         
-        /* Lås kolumnrubriker så de inte flyttas av misstag på mobilen */
         [data-testid="stHeader"] button,
         div[role="columnheader"] {{
             pointer-events: none !important;
@@ -111,35 +110,33 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# SÄKER OCH AGGRESSIV BILDHANTERING FOR ATT UNDVIKA OOM-KRASCHER
+# SÄKER BILDHANTERING MED DIREKT STRÖM-LÄSNING
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
     
     try:
-        # Öppna bilden säkert
+        # Läs in bilden
         img = Image.open(file_buffer)
         
-        # Orientera bilden rätt baserat på EXIF
+        # Rätta till bildorienteringen från mobilen
         img = ImageOps.exif_transpose(img)
         
-        # Konvertera till RGB om den är i RGBA/annan färgrymd
         if img.mode != "RGB":
             img = img.convert("RGB")
             
-        # Skala ner kraftigt för att spara minne (max 400x550px)
-        img.thumbnail((400, 550), Image.Resampling.LANCZOS)
+        # Skala ner för att förhindra krascher i minnet
+        img.thumbnail((500, 700), Image.Resampling.LANCZOS)
         
-        # Spara till komprimerad JPG
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=70, optimize=True)
+        img.save(buffered, format="JPEG", quality=75, optimize=True)
         img_str = base64.b64encode(buffered.getvalue()).decode()
         return f"data:image/jpeg;base64,{img_str}"
     except Exception as e:
-        st.error(f"Kunde inte behandla bilden: {e}")
+        st.error(f"Kunde inte spara bilden: {e}")
         return ""
 
-# Ladda data från GitHub eller sätt standard
+# Ladda data
 app_data = load_data_from_github()
 if not app_data:
     app_data = {
@@ -150,9 +147,9 @@ if not app_data:
         "sets_list": [{"SetBet": "CIN", "Set": "Crimson Invasion (CIN)", "Maxnr": "111"}]
     }
 
-current_rate = 11.5  # EUR till SEK växelkurs
+current_rate = 11.5
 
-# DIALOGRUTA MED BILD (Säker visning och alltid synlig sparaknapp)
+# DIALOGRUTA (Använder mobilens egen kamera via file_uploader)
 @st.dialog("🎴 Kortdetaljer & Skanner")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -176,24 +173,25 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    st.markdown("**📷 Byt / Skanna bild för detta kort:**")
-    cam_img = st.camera_input("Öppna kamera", key=f"cam_{selected_index}")
-    file_img = st.file_uploader("Välj bild eller ta ett nytt foto", key=f"file_{selected_index}")
+    st.markdown("**📷 Ta ett foto / Välj från galleri:**")
+    st.caption("Tips: Tryck nedan och välj 'Kamera' för att ta en zooma/närbild med telefonens riktiga kamera.")
     
-    new_img_str = ""
-    if cam_img:
-        new_img_str = process_uploaded_image(cam_img)
-    elif file_img:
-        new_img_str = process_uploaded_image(file_img)
-        
-    if st.button("💾 Spara bilden", type="primary", use_container_width=True):
+    # file_uploader öppnar mobilens externa kamera (stödjer makro/zoom utan krasch)
+    uploaded_file = st.file_uploader(
+        "Klicka för kamera/galleri", 
+        type=["jpg", "jpeg", "png", "heic"], 
+        key=f"uploader_{selected_index}"
+    )
+    
+    if uploaded_file is not None:
+        new_img_str = process_uploaded_image(uploaded_file)
         if new_img_str:
-            app_data["collection"][selected_index]["Bild"] = new_img_str
-            save_data_to_github(app_data)
-            st.success("Bilden sparades!")
-            st.rerun()
-        else:
-            st.warning("Du måste ta ett foto eller välja en bildfil först!")
+            st.image(uploaded_file, caption="Förhandsvisning", width=200)
+            if st.button("💾 Spara den nya bilden", type="primary", use_container_width=True):
+                app_data["collection"][selected_index]["Bild"] = new_img_str
+                save_data_to_github(app_data)
+                st.success("Bilden sparades!")
+                st.rerun()
 
 # --- HUVUDLAYOUT ---
 tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till / Skanna"])
@@ -255,13 +253,12 @@ with tab1:
             
             st.divider()
             
-            # --- FÖRBÄTTRAD VALJARE FÖR ATT SLIPPA TANGENTBORD ---
             max_rows = len(edited_df)
             col_scan_sel, col_scan_btn = st.columns([1, 1])
             
             with col_scan_sel:
                 selected_row_num = st.number_input(
-                    "📷 Välj radnummer att skanna/fotografera:", 
+                    "📷 Välj radnummer att fotografera:", 
                     min_value=1, 
                     max_value=max(1, max_rows), 
                     value=1, 
@@ -274,7 +271,7 @@ with tab1:
                     st.caption(f"Valt kort: **Rad {selected_row_num} - {current_card_name} ({current_card_set})**")
 
             with col_scan_btn:
-                st.write("") # Marginaljustering
+                st.write("")
                 st.write("")
                 if st.button("📷 Öppna kamera för valt kort", use_container_width=True):
                     if max_rows > 0:
@@ -354,13 +351,10 @@ with tab2:
 # --- FLIK 3: LÄGG TILL NYTT KORT ---
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
-    cam_image = st.camera_input("📷 Ta foto på det nya kortet")
-    file_image = st.file_uploader("Välj bild eller ta ett nytt foto")
+    file_image = st.file_uploader("📷 Ta ett foto eller välj bild", type=["jpg", "jpeg", "png", "heic"])
     
     final_img_str = ""
-    if cam_image:
-        final_img_str = process_uploaded_image(cam_image)
-    elif file_image:
+    if file_image:
         final_img_str = process_uploaded_image(file_image)
 
     with st.form("add_new_card_form"):
