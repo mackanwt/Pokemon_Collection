@@ -57,6 +57,12 @@ st.markdown(f"""
             touch-action: manipulation;
         }}
         
+        /* Hindrar mobilens tangentbord från att öppnas vid tryck på Selectbox */
+        div[data-baseweb="select"] input {{
+            aria-autocomplete: none !important;
+            inputmode: none !important;
+        }}
+        
         /* Lås kolumnrubriker så de inte flyttas av misstag på mobilen */
         [data-testid="stHeader"] button,
         div[role="columnheader"] {{
@@ -116,7 +122,6 @@ def process_uploaded_image(file_buffer):
     img = Image.open(file_buffer)
     img = ImageOps.exif_transpose(img)
     
-    # Ändrad storlek som behåller hela kortets stående rektangulära form utan beskärning
     img.thumbnail((450, 600))
     
     buffered = io.BytesIO()
@@ -137,14 +142,15 @@ if not app_data:
 
 current_rate = 11.5  # EUR till SEK växelkurs
 
-# DIALOGRUTA MED STOR BILD (Säkerställd st.image utan krasch)
+# DIALOGRUTA MED BILD (Fixad utan st.image-parameterkrasch)
 @st.dialog("🎴 Kortdetaljer & Skanner")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
     st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
     
-    if card_data.get("Bild"):
-        st.image(card_data["Bild"], use_column_width=True)
+    img_url = card_data.get("Bild")
+    if img_url:
+        st.image(img_url)
     else:
         st.info("Ingen bild finns sparad för detta kort ännu.")
     
@@ -152,7 +158,6 @@ def show_card_dialog(selected_index, card_data):
     
     st.markdown("**📷 Byt / Skanna bild för detta kort:**")
     cam_img = st.camera_input("Öppna kamera", key=f"cam_{selected_index}")
-    
     file_img = st.file_uploader("Välj bild eller ta ett nytt foto", key=f"file_{selected_index}")
     
     new_img_str = ""
