@@ -4,9 +4,8 @@ import json
 import base64
 import requests
 from datetime import date
-from PIL import Image
+from PIL import Image, ImageOps
 import io
-import streamlit.components.v1 as components
 
 # --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -56,79 +55,23 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DIN BLÅA KAMERAKNAPP (MED FIXAD STREAMLIT-KOMMUNIKATION) ---
-def custom_mobile_camera(key_id):
-    html_code = f"""
-    <div style="font-family: system-ui, -apple-system, sans-serif; text-align: center;">
-        <label for="input_{key_id}" style="
-            background-color: #0068c9;
-            color: white;
-            padding: 12px 18px;
-            border-radius: 8px;
-            cursor: pointer;
-            display: inline-block;
-            font-weight: 600;
-            font-size: 15px;
-            width: 100%;
-            box-sizing: border-box;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        ">
-            📷 Ta närbild med kameran
-        </label>
-        <input type="file" id="input_{key_id}" accept="image/*" capture="environment" style="display:none;" onchange="handleFile_{key_id}(event)">
-        <div id="msg_{key_id}" style="margin-top: 6px; font-size: 13px; color: #28a745; font-weight: bold;"></div>
-    </div>
-
-    <script>
-    function handleFile_{key_id}(event) {{
-        const file = event.target.files[0];
-        if (!file) return;
-
-        document.getElementById('msg_{key_id}').innerText = "Behandlar bild...";
-
-        const reader = new FileReader();
-        reader.onload = function(e) {{
-            const img = new Image();
-            img.onload = function() {{
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-                const max_size = 500;
-
-                if (width > height) {{
-                    if (width > max_size) {{
-                        height *= max_size / width;
-                        width = max_size;
-                    }}
-                }} else {{
-                    if (height > max_size) {{
-                        width *= max_size / height;
-                        height = max_size;
-                    }}
-                }}
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                
-                document.getElementById('msg_{key_id}').innerText = "✓ Bild laddad! Tryck på spara.";
-                
-                // Skicka bilden direkt till Streamlits session via postMessage
-                window.parent.postMessage({{
-                    type: 'streamlit:setComponentValue',
-                    value: compressedDataUrl
-                }}, '*');
-            }};
-            img.src = e.target.result;
-        }};
-        reader.readAsDataURL(file);
-    }}
-    </script>
-    """
-    return components.html(html_code, height=85)
+# --- HJÄLPFUNKTION FÖR BILD-OMVANDLING ---
+def process_uploaded_image(file_buffer):
+    if not file_buffer:
+        return ""
+    try:
+        img = Image.open(file_buffer)
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGB")
+        img.thumbnail((600, 600))
+        
+        buffered = io.BytesIO()
+        img.save(buffered, format="JPEG", quality=75)
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        return f"data:image/jpeg;base64,{img_str}"
+    except Exception as e:
+        st.error(f"Fel vid bildbehandling: {e}")
+        return ""
 
 # --- GITHUB INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
@@ -195,8 +138,8 @@ if not app_data:
 
 current_rate = 11.5
 
-# DIALOGRUTA FÖR BILDER OCH SKANNING
-@st.dialog("🎴 Kortdetaljer & Lägg till bild")
+# DIALOGRUTA FÖR BILDER
+@st.dialog("🎴 Kortdetaljer & Välj bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
     st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
@@ -217,19 +160,21 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    captured_image = custom_mobile_camera(f"dialog_{selected_index}")
+    uploaded_file = st.file_uploader("🖼️ Välj bild från galleriet/filerna", type=["jpg", "jpeg", "png"], key=f"dialog_upload_{selected_index}")
     
-    if captured_image:
-        if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
-            app_data["collection"][selected_index]["Bild"] = str(captured_image)
-            save_data_to_github(app_data)
-            
-            for key in list(st.session_state.keys()):
-                if "editor" in key:
-                    del st.session_state[key]
+    if uploaded_file:
+        if st.button("💾 Spara vald bild på kortet", type="primary", use_container_width=True):
+            img_b64 = process_uploaded_image(uploaded_file)
+            if img_b64:
+                app_data["collection"][selected_index]["Bild"] = img_b64
+                save_data_to_github(app_data)
+                
+                for key in list(st.session_state.keys()):
+                    if "editor" in key:
+                        del st.session_state[key]
 
-            st.success("Bilden sparades!")
-            st.rerun()
+                st.success("Bilden sparades!")
+                st.rerun()
 
 # --- HUVUDLAYOUT ---
 tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort"])
@@ -408,7 +353,7 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    new_card_img_raw = custom_mobile_camera("add_new_card")
+    new_uploaded_file = st.file_uploader("🖼️ Välj bild från galleriet/filerna", type=["jpg", "jpeg", "png"], key="new_card_upload")
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
@@ -432,10 +377,10 @@ with tab3:
             varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
         
         if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
-            final_img_str = str(new_card_img_raw) if new_card_img_raw else ""
+            img_b64 = process_uploaded_image(new_uploaded_file) if new_uploaded_file else ""
             
             new_card = {
-                "Bild": final_img_str,
+                "Bild": img_b64,
                 "Pärmnummer": parm,
                 "Språk": sprak,
                 "Namn": namn,
