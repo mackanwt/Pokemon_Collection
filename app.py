@@ -68,6 +68,22 @@ st.markdown(f"""
             pointer-events: auto !important;
         }}
     </style>
+
+    <!-- TVINGA NATIVE KAMERA I MOBILER -->
+    <script>
+        const forceCameraAccess = () => {{
+            const inputs = document.querySelectorAll('input[type="file"]');
+            inputs.forEach(input => {{
+                input.setAttribute('accept', 'image/*');
+                input.setAttribute('capture', 'environment');
+            }});
+        }};
+        
+        // Kör vid laddning och vid DOM-ändringar (när st.dialog öppnas)
+        const observer = new MutationObserver(forceCameraAccess);
+        observer.observe(document.body, {{ childList: true, subtree: true }});
+        window.addEventListener('load', forceCameraAccess);
+    </script>
 """, unsafe_allow_html=True)
 
 # --- GITHUB INTEGRATION ---
@@ -110,7 +126,7 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# SÄKER BILDHANTERING FÖR ATT UNDVIKA KRASCH VID NÄRBILDER
+# SÄKER BILDHANTERING MED AUTOMATISK KOMPRIMERING
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
@@ -124,7 +140,6 @@ def process_uploaded_image(file_buffer):
         if img.mode != "RGB":
             img = img.convert("RGB")
             
-        # Skala ner upplösningen så att tunga detaljer från närbilder inte kraschar appen
         img.thumbnail((600, 800), Image.Resampling.LANCZOS)
         
         buffered = io.BytesIO()
@@ -172,9 +187,8 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    # Tillåtna bildtyper som aktiverar kameramenyn i mobilen
     up_file = st.file_uploader(
-        "📷 Ta ett foto eller välj från galleri", 
+        "📷 Ta ett foto med kameran", 
         type=["png", "jpg", "jpeg", "heic", "webp"], 
         key=f"dialog_file_{selected_index}"
     )
@@ -348,7 +362,7 @@ with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
     f_img = st.file_uploader(
-        "📷 Ta ett foto eller välj bild på kortet", 
+        "📷 Ta ett foto på kortet", 
         type=["png", "jpg", "jpeg", "heic", "webp"], 
         key="add_new_uploader"
     )
