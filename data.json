@@ -30,7 +30,7 @@
       "Värde (EUR)": 2.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 23.0,
-      "Bild": "nan"
+      "Bild": "DeltaGenerator(_root_container=2, _provided_cursor=LockedCursor(_transient_elements=SparseList({}), _root_container=2, _index=4, _parent_path=(0, 0)), _parent=DeltaGenerator(_root_container=2, _provided_cursor=RunningCursor(_transient_elements=SparseList({}), _root_container=2, _parent_path=(0, 0), _index=6), _parent=DeltaGenerator(_root_container=2, _provided_cursor=RunningCursor(_transient_elements=SparseList({}), _root_container=2, _parent_path=(0,), _index=1), _parent=DeltaGenerator(_root_container=2, _provided_cursor=RunningCursor(_transient_elements=SparseList({}), _root_container=2, _parent_path=(), _index=1), _parent=DeltaGenerator(_provided_cursor=RunningCursor(_transient_elements=SparseList({}), _parent_path=(), _index=2))), _block_type='dialog', _form_data=FormData(form_id='')), _block_type='flex_container', _creating_fragment_id='e10a75566b640f9685057a723ba8a56b', _form_data=FormData(form_id='')), _form_data=FormData(form_id=''))"
     },
     {
       "Pärmnummer": 3,
