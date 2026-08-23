@@ -160,7 +160,7 @@ def save_data_to_github(data_dict):
     res = requests.get(url, headers=headers)
     sha = res.json()["sha"] if res.status_code == 200 else None
     
-    # Säkerställ att alla bildsträngar är rena strängar (JSON-kompatibla)
+    # Säkerställ ren text-JSON för bildfältet
     clean_collection = []
     for item in data_dict.get("collection", []):
         clean_item = dict(item)
@@ -224,14 +224,11 @@ def show_card_dialog(selected_index, card_data):
     img_data_from_cam = custom_mobile_camera(f"dialog_{selected_index}")
     
     if img_data_from_cam:
-        # Säkerställ att vi sparar som ren text
-        clean_img_str = str(img_data_from_cam)
-        if clean_img_str.startswith("data:image"):
-            if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
-                app_data["collection"][selected_index]["Bild"] = clean_img_str
-                save_data_to_github(app_data)
-                st.success("Bilden sparades!")
-                st.rerun()
+        if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
+            app_data["collection"][selected_index]["Bild"] = str(img_data_from_cam)
+            save_data_to_github(app_data)
+            st.success("Bilden sparades!")
+            st.rerun()
 
 # --- HUVUDLAYOUT ---
 tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort"])
@@ -393,7 +390,7 @@ with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
     new_card_img_raw = custom_mobile_camera("add_new_card")
-    final_img_str = str(new_card_img_raw) if (new_card_img_raw and str(new_card_img_raw).startswith("data:image")) else ""
+    final_img_str = str(new_card_img_raw) if new_card_img_raw else ""
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
