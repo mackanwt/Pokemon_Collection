@@ -129,6 +129,16 @@ def process_uploaded_image(file_buffer):
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return f"data:image/jpeg;base64,{img_str}"
 
+# Hjälpfunktion för att konvertera Base64 till PIL-bild snyggt för st.image
+def load_base64_image(base64_str):
+    try:
+        if "," in base64_str:
+            base64_str = base64_str.split(",")[1]
+        img_bytes = base64.b64decode(base64_str)
+        return Image.open(io.BytesIO(img_bytes))
+    except Exception:
+        return None
+
 # Ladda data från GitHub eller sätt standard
 app_data = load_data_from_github()
 if not app_data:
@@ -142,15 +152,19 @@ if not app_data:
 
 current_rate = 11.5  # EUR till SEK växelkurs
 
-# DIALOGRUTA MED BILD (Fixad utan st.image-parameterkrasch)
+# DIALOGRUTA MED BILD (Fixad Base64-avkodning)
 @st.dialog("🎴 Kortdetaljer & Skanner")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
     st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
     
-    img_url = card_data.get("Bild")
-    if img_url:
-        st.image(img_url)
+    raw_img = card_data.get("Bild", "")
+    if raw_img:
+        pil_img = load_base64_image(raw_img)
+        if pil_img:
+            st.image(pil_img)
+        else:
+            st.warning("Kunde inte läsa in bildformatet.")
     else:
         st.info("Ingen bild finns sparad för detta kort ännu.")
     
