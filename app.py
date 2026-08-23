@@ -4,8 +4,9 @@ import json
 import base64
 import requests
 from datetime import date
-from PIL import Image
+from PIL import Image, ImageOps
 import io
+import streamlit.components.v1 as components
 
 # --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -55,23 +56,78 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- HJÄLPFUNKTION FÖR BILD-KOMPRIMERING ---
-def process_uploaded_image(uploaded_file):
-    """Tar emot en fil från mobilen, förminskar den och gör om till Base64-sträng."""
-    if uploaded_file is None:
-        return ""
-    try:
-        img = Image.open(uploaded_file)
-        img = img.convert("RGB")
-        img.thumbnail((800, 800))
-        
-        buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=70)
-        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-        return f"data:image/jpeg;base64,{img_str}"
-    except Exception as e:
-        st.error(f"Kunde inte behandla bilden: {e}")
-        return ""
+# --- SKRÄDDARSYDD KAMERA & BILD-KOMPRIMERARE FÖR MOBIL ---
+def custom_mobile_camera(key_id):
+    html_code = f"""
+    <div style="font-family: system-ui, -apple-system, sans-serif; text-align: center;">
+        <label for="input_{key_id}" style="
+            background-color: #0068c9;
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-block;
+            font-weight: 600;
+            font-size: 15px;
+            width: 100%;
+            box-sizing: border-box;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        ">
+            📷 Ta närbild med kameran / Välj bild
+        </label>
+        <input type="file" id="input_{key_id}" accept="image/*" capture="environment" style="display:none;" onchange="handleFile(event)">
+        <div id="msg_{key_id}" style="margin-top: 6px; font-size: 13px; color: #28a745; font-weight: bold;"></div>
+    </div>
+
+    <script>
+    function handleFile(event) {{
+        const file = event.target.files[0];
+        if (!file) return;
+
+        document.getElementById('msg_{key_id}').innerText = "Behandlar bild...";
+
+        const reader = new FileReader();
+        reader.onload = function(e) {{
+            const img = new Image();
+            img.onload = function() {{
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const max_size = 800;
+
+                if (width > height) {{
+                    if (width > max_size) {{
+                        height *= max_size / width;
+                        width = max_size;
+                    }}
+                }} else {{
+                    if (height > max_size) {{
+                        width *= max_size / height;
+                        height = max_size;
+                    }}
+                }}
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                
+                document.getElementById('msg_{key_id}').innerText = "✓ Bild klar! Tryck på Spara nedan.";
+
+                window.parent.postMessage({{
+                    type: 'streamlit:setComponentValue',
+                    value: compressedDataUrl
+                }}, '*');
+            }};
+            img.src = e.target.result;
+        }};
+        reader.readAsDataURL(file);
+    }}
+    </script>
+    """
+    return components.html(html_code, height=90)
 
 # --- GITHUB INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
@@ -103,13 +159,15 @@ def save_data_to_github(data_dict):
     clean_collection = []
     for item in data_dict.get("collection", []):
         clean_item = dict(item)
-        val = str(clean_item.get("Bild", "")).strip()
-        if not (val.startswith("data:image") or val.startswith("http")):
-            val = ""
-        clean_item["Bild"] = val
+        if "Bild" in clean_item:
+            val = str(clean_item["Bild"]) if clean_item["Bild"] is not None else ""
+            if not (val.startswith("data:image") or val.startswith("http")):
+                val = ""
+            clean_item["Bild"] = val
         clean_collection.append(clean_item)
     
     data_dict["collection"] = clean_collection
+    
     content_str = json.dumps(data_dict, indent=2, ensure_ascii=False)
     encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
     
@@ -136,8 +194,49 @@ if not app_data:
 
 current_rate = 11.5
 
+# DIALOGRUTA FÖR BILDER OCH SKANNING
+@st.dialog("🎴 Kortdetaljer & Lägg till bild")
+def show_card_dialog(selected_index, card_data):
+    st.markdown(f"### {card_data.get('Namn', '')}")
+    st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
+    
+    raw_img = card_data.get("Bild", "")
+    if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
+        try:
+            if raw_img.startswith("data:image"):
+                base64_data = raw_img.split(",")[1]
+                img_bytes = base64.b64decode(base64_data)
+                st.image(Image.open(io.BytesIO(img_bytes)))
+            else:
+                st.image(raw_img)
+        except Exception:
+            st.info("Ingen giltig bild finns sparad för detta kort ännu.")
+    else:
+        st.info("Ingen bild finns sparad för detta kort ännu.")
+    
+    st.divider()
+    
+    img_data_from_cam = custom_mobile_camera(f"dialog_{selected_index}")
+    
+    if img_data_from_cam:
+        if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
+            img_str = str(img_data_from_cam)
+            
+            # Uppdatera i data-strukturen
+            app_data["collection"][selected_index]["Bild"] = img_str
+            save_data_to_github(app_data)
+            
+            # Nollställ data_editors cache så att den nya bilden laddas in i tabellen
+            if "main_collection_editor" in st.session_state:
+                del st.session_state["main_collection_editor"]
+            if "text_editor_grid" in st.session_state:
+                del st.session_state["text_editor_grid"]
+
+            st.success("Bilden sparades!")
+            st.rerun()
+
 # --- HUVUDLAYOUT ---
-tab1, tab2, tab3 = st.tabs(["📊 Samling", "🖼️ Lägg till bild på kort", "➕ Lägg till nytt kort"])
+tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort"])
 
 # --- FLIK 1: HUVUDSAMLING ---
 with tab1:
@@ -158,6 +257,7 @@ with tab1:
             return ""
 
         collection_df["Bild"] = collection_df["Bild"].apply(sanitize_img)
+
         df_display = collection_df.copy()
         
         df_display["Värde (EUR)"] = pd.to_numeric(df_display["Värde (EUR)"], errors='coerce').fillna(0.0)
@@ -188,7 +288,7 @@ with tab1:
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
 
-        edit_mode = st.toggle("✏️ Redigeringsläge (Text/Värden)", value=False)
+        edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
         if edit_mode:
             edited_df = st.data_editor(
@@ -199,6 +299,32 @@ with tab1:
                 use_container_width=True,
                 key="main_collection_editor"
             )
+            
+            st.divider()
+            
+            max_rows = len(edited_df)
+            col_scan_sel, col_scan_btn = st.columns([1, 1])
+            
+            with col_scan_sel:
+                selected_row_num = st.number_input(
+                    "🖼️ Välj radnummer för bild:", 
+                    min_value=1, 
+                    max_value=max(1, max_rows), 
+                    value=1, 
+                    step=1
+                )
+                selected_row_idx = selected_row_num - 1
+                if max_rows > 0:
+                    current_card_name = edited_df.iloc[selected_row_idx].get('Namn', '')
+                    current_card_set = edited_df.iloc[selected_row_idx].get('Setnr.', '')
+                    st.caption(f"Valt kort: **Rad {selected_row_num} - {current_card_name} ({current_card_set})**")
+
+            with col_scan_btn:
+                st.write("")
+                st.write("")
+                if st.button("🖼️ Hantera bild för valt kort", use_container_width=True):
+                    if max_rows > 0:
+                        show_card_dialog(selected_row_idx, edited_df.iloc[selected_row_idx])
             
             st.divider()
             if st.button("💾 Spara alla ändringar i samlingen", type="primary", use_container_width=True):
@@ -229,62 +355,54 @@ with tab1:
     else:
         st.info("Samlingen är tom.")
 
-# --- FLIK 2: KOPPLA BILD TILL KORT ---
+# --- FLIK 2: REDIGERINGSLÄGE FÖR TEXT/DATA ---
 with tab2:
-    st.subheader("🖼️ Lägg till / Byt bild på ett kort")
+    st.subheader("✏️ Massredigera text och värden")
+    collection_df = pd.DataFrame(app_data.get("collection", []))
     
-    collection = app_data.get("collection", [])
-    if not collection:
-        st.info("Samlingen är tom. Lägg till ett kort först.")
-    else:
-        card_options = [
-            f"Rad {i+1}: {card.get('Namn', '')} ({card.get('Set', '')} - {card.get('Setnr.', '')})"
-            for i, card in enumerate(collection)
+    if not collection_df.empty:
+        df_display = collection_df.copy()
+        columns_order = [
+            "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
+            "Övrigt", "Skick", "Köpt för (EUR)", "Köpt för (SEK)", 
+            "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
         ]
         
-        selected_card_str = st.selectbox("Välj kort i samlingen:", card_options)
-        selected_idx = card_options.index(selected_card_str)
-        selected_card = collection[selected_idx]
+        editable_config = {
+            "Bild": st.column_config.ImageColumn("Bild", width="small"),
+            "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
+            "Språk": st.column_config.TextColumn("Språk", width="small"),
+            "Namn": st.column_config.TextColumn("Namn", width="medium"),
+            "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
+            "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
+            "Set": st.column_config.TextColumn("Set", width="large"),
+            "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
+            "Skick": st.column_config.TextColumn("Skick", width="small"),
+            "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", width="small", format="%.2f"),
+            "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
+        }
+
+        edited_df = st.data_editor(
+            df_display,
+            column_order=columns_order,
+            column_config=editable_config,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="text_editor_grid"
+        )
         
-        col_img_prev, col_img_up = st.columns([1, 1])
-        
-        with col_img_prev:
-            st.caption("Nuvarande bild:")
-            curr_img = selected_card.get("Bild", "")
-            if curr_img and (curr_img.startswith("data:image") or curr_img.startswith("http")):
-                try:
-                    if curr_img.startswith("data:image"):
-                        base64_data = curr_img.split(",")[1]
-                        st.image(Image.open(io.BytesIO(base64.b64decode(base64_data))))
-                    else:
-                        st.image(curr_img)
-                except Exception:
-                    st.info("Kunde inte läsa nuvarande bild.")
-            else:
-                st.info("Ingen bild sparad på detta kort ännu.")
-                
-        with col_img_up:
-            st.caption("📷 Ta ny närbild eller välj fil:")
-            new_file = st.file_uploader("Välj eller ta bild för kortet", type=["jpg", "jpeg", "png"], key=f"up_{selected_idx}")
-            
-            if new_file is not None:
-                if st.button("💾 Spara ny bild på kortet", type="primary", use_container_width=True):
-                    base64_img = process_uploaded_image(new_file)
-                    if base64_img:
-                        app_data["collection"][selected_idx]["Bild"] = base64_img
-                        save_data_to_github(app_data)
-                        
-                        if "main_collection_editor" in st.session_state:
-                            del st.session_state["main_collection_editor"]
-                            
-                        st.success("Bilden sparades framgångsrikt!")
-                        st.rerun()
+        if st.button("💾 Spara alla textändringar till GitHub", type="primary"):
+            app_data["collection"] = edited_df.to_dict(orient="records")
+            save_data_to_github(app_data)
+            st.success("Samlingen sparades!")
+            st.rerun()
 
 # --- FLIK 3: LÄGG TILL NYTT KORT ---
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
-
-    uploaded_new_file = st.file_uploader("📷 Ta närbild / Välj bild till nytt kort", type=["jpg", "jpeg", "png"], key="new_card_up")
+    
+    new_card_img_raw = custom_mobile_camera("add_new_card")
+    final_img_str = str(new_card_img_raw) if new_card_img_raw else ""
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
@@ -308,10 +426,8 @@ with tab3:
             varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
         
         if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
-            final_img = process_uploaded_image(uploaded_new_file) if uploaded_new_file else ""
-            
             new_card = {
-                "Bild": final_img,
+                "Bild": final_img_str,
                 "Pärmnummer": parm,
                 "Språk": sprak,
                 "Namn": namn,
@@ -332,6 +448,8 @@ with tab3:
             
             if "main_collection_editor" in st.session_state:
                 del st.session_state["main_collection_editor"]
-                
+            if "text_editor_grid" in st.session_state:
+                del st.session_state["text_editor_grid"]
+
             st.success(f"Kortet {namn} skapades och sparades!")
             st.rerun()
