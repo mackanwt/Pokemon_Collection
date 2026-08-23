@@ -30,7 +30,7 @@
       "Värde (EUR)": 2.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 23.0,
-      "Bild": "DeltaGenerator(_root_container=2, _provided_cursor=LockedCursor(_transient_elements=SparseList({}), _root_container=2, _index=4, _parent_path=(0, 0)), _parent=DeltaGenerator(_root_container=2, _provided_cursor=RunningCursor(_transient_elements=SparseList({}), _root_container=2, _parent_path=(0, 0), _index=6), _parent=DeltaGenerator(_root_container=2, _provided_cursor=RunningCursor(_transient_elements=SparseList({}), _root_container=2, _parent_path=(0,), _index=1), _parent=DeltaGenerator(_root_container=2, _provided_cursor=RunningCursor(_transient_elements=SparseList({}), _root_container=2, _parent_path=(), _index=1), _parent=DeltaGenerator(_provided_cursor=RunningCursor(_transient_elements=SparseList({}), _parent_path=(), _index=2))), _block_type='dialog', _form_data=FormData(form_id='')), _block_type='flex_container', _creating_fragment_id='e10a75566b640f9685057a723ba8a56b', _form_data=FormData(form_id='')), _form_data=FormData(form_id=''))"
+      "Bild": ""
     },
     {
       "Pärmnummer": 3,
@@ -46,7 +46,7 @@
       "Värde (EUR)": 6.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 69.0,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 4,
@@ -62,7 +62,7 @@
       "Värde (EUR)": 3.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 34.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 5,
@@ -78,7 +78,7 @@
       "Värde (EUR)": 3.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 34.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 6,
@@ -94,7 +94,7 @@
       "Värde (EUR)": 5.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 57.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 7,
@@ -110,7 +110,7 @@
       "Värde (EUR)": 22.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 253.0,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 8,
@@ -126,7 +126,7 @@
       "Värde (EUR)": 12.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 138.0,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 9,
@@ -142,7 +142,7 @@
       "Värde (EUR)": 13.5,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 155.25,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 10,
@@ -158,7 +158,7 @@
       "Värde (EUR)": 38.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 437.0,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 11,
@@ -174,7 +174,7 @@
       "Värde (EUR)": 0.3,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 3.45,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 12,
@@ -190,7 +190,7 @@
       "Värde (EUR)": 15.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 172.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 13,
@@ -206,7 +206,7 @@
       "Värde (EUR)": 1.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 11.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 14,
@@ -222,7 +222,7 @@
       "Värde (EUR)": 1.5,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 17.25,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 15,
@@ -238,7 +238,7 @@
       "Värde (EUR)": 2.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 23.0,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 16,
@@ -254,7 +254,7 @@
       "Värde (EUR)": 0.5,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 5.75,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 17,
@@ -270,7 +270,7 @@
       "Värde (EUR)": 0.5,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 5.75,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 18,
@@ -286,7 +286,7 @@
       "Värde (EUR)": 10.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 115.0,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 19,
@@ -302,7 +302,7 @@
       "Värde (EUR)": 0.03,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 0.34,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 20,
@@ -318,7 +318,7 @@
       "Värde (EUR)": 1.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 11.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 21,
@@ -334,7 +334,7 @@
       "Värde (EUR)": 0.6,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 6.9,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 22,
@@ -350,7 +350,7 @@
       "Värde (EUR)": 0.3,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 3.45,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 23,
@@ -366,7 +366,7 @@
       "Värde (EUR)": 0.8,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 9.2,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 24,
@@ -382,7 +382,7 @@
       "Värde (EUR)": 1.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 11.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 25,
@@ -398,7 +398,7 @@
       "Värde (EUR)": 0.5,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 5.75,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 26,
@@ -414,7 +414,7 @@
       "Värde (EUR)": 0.5,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 5.75,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 27,
@@ -430,7 +430,7 @@
       "Värde (EUR)": 0.5,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 5.75,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 28,
@@ -446,7 +446,7 @@
       "Värde (EUR)": 9.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 103.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 29,
@@ -462,7 +462,7 @@
       "Värde (EUR)": 9.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 103.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 30,
@@ -478,7 +478,7 @@
       "Värde (EUR)": 9.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 103.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 31,
@@ -494,7 +494,7 @@
       "Värde (EUR)": 200.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 2300.0,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 32,
@@ -510,7 +510,7 @@
       "Värde (EUR)": 1.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 11.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 33,
@@ -526,7 +526,7 @@
       "Värde (EUR)": 7.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 80.5,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 34,
@@ -542,7 +542,7 @@
       "Värde (EUR)": 0.02,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 0.23,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 35,
@@ -558,7 +558,7 @@
       "Värde (EUR)": 0.6,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 6.9,
-      "Bild": "nan"
+      "Bild": ""
     },
     {
       "Pärmnummer": 36,
@@ -574,7 +574,7 @@
       "Värde (EUR)": 3.0,
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 34.5,
-      "Bild": "nan"
+      "Bild": ""
     }
   ],
   "sets_list": [
