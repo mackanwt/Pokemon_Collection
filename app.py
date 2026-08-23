@@ -55,30 +55,44 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- HJÄLPFUNKTION FÖR BILD-OMVANDLING (MED KORREKT ROTATION) ---
-def process_uploaded_image(file_buffer):
-    if not file_buffer:
-        return ""
+# --- HJÄLPFUNKTION FÖR BILD-OMVANDLING OCH ROTATION ---
+def process_pil_image(img, rotate_degrees=0):
+    """Tar en PIL-bild, tillämpar rotation, ändrar storlek och returnerar base64-sträng."""
     try:
-        img = Image.open(file_buffer)
-        
-        # Återställer rätt rotation utifrån mobilens EXIF-data
+        # Grundläggande EXIF-orientering först
         try:
             img = ImageOps.exif_transpose(img)
         except Exception:
             pass
 
+        # Manuell rotation om användaren tryckt på rotera-knapparna
+        if rotate_degrees != 0:
+            # Image.ROTATE_90, ROTATE_180, ROTATE_270 alt expand=True
+            img = img.rotate(-rotate_degrees, expand=True)
+
         img = img.convert("RGB")
         img.thumbnail((600, 600))
         
         buffered = io.BytesIO()
-        # Sparar utan EXIF-taggar så att alla webbläsare visar bilden rätt direkt
         img.save(buffered, format="JPEG", quality=75)
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
         return f"data:image/jpeg;base64,{img_str}"
     except Exception as e:
         st.error(f"Fel vid bildbehandling: {e}")
         return ""
+
+def get_pil_from_uploaded_file(file_buffer):
+    if not file_buffer:
+        return None
+    try:
+        img = Image.open(file_buffer)
+        try:
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+        return img
+    except Exception:
+        return None
 
 # --- GITHUB INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
@@ -145,43 +159,67 @@ if not app_data:
 
 current_rate = 11.5
 
-# DIALOGRUTA FÖR BILDER
+# DIALOGRUTA FÖR BILDER MED ROTERING
 @st.dialog("🎴 Kortdetaljer & Välj bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
     st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
     
-    raw_img = card_data.get("Bild", "")
-    if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
-        try:
-            if raw_img.startswith("data:image"):
-                base64_data = raw_img.split(",")[1]
-                img_bytes = base64.b64decode(base64_data)
-                st.image(Image.open(io.BytesIO(img_bytes)), width=220, caption="Sparad bild")
-            else:
-                st.image(raw_img, width=220, caption="Sparad bild")
-        except Exception:
-            st.info("Ingen bild finns sparad för detta kort ännu.")
-    else:
-        st.info("Ingen bild finns sparad för detta kort ännu.")
-    
-    st.divider()
-    
+    # Initiera rotationsstatus i session state för dialogen
+    rot_key = f"dialog_rotation_{selected_index}"
+    if rot_key not in st.session_state:
+        st.session_state[rot_key] = 0
+
     uploaded_file = st.file_uploader("🖼️ Välj bild från galleriet/filerna", type=["jpg", "jpeg", "png"], key=f"dialog_upload_{selected_index}")
     
     if uploaded_file:
-        if st.button("💾 Spara vald bild på kortet", type="primary", use_container_width=True):
-            img_b64 = process_uploaded_image(uploaded_file)
-            if img_b64:
-                app_data["collection"][selected_index]["Bild"] = img_b64
-                save_data_to_github(app_data)
-                
-                for key in list(st.session_state.keys()):
-                    if "editor" in key:
-                        del st.session_state[key]
+        pil_img = get_pil_from_uploaded_file(uploaded_file)
+        if pil_img:
+            # Visa roteringsknappar
+            col_left, col_right = st.columns(2)
+            with col_left:
+                if st.button("🔄 Rotera 90° Vänster", key=f"rot_left_{selected_index}", use_container_width=True):
+                    st.session_state[rot_key] = (st.session_state[rot_key] - 90) % 360
+            with col_right:
+                if st.button("🔄 Rotera 90° Höger", key=f"rot_right_{selected_index}", use_container_width=True):
+                    st.session_state[rot_key] = (st.session_state[rot_key] + 90) % 360
 
-                st.success("Bilden sparades!")
-                st.rerun()
+            # Rotera bilden för förhandsvisning
+            current_rot = st.session_state[rot_key]
+            preview_img = pil_img.rotate(-current_rot, expand=True) if current_rot != 0 else pil_img
+            
+            st.image(preview_img, width=220, caption=f"Förhandsvisning (Rotation: {current_rot}°)")
+            
+            if st.button("💾 Spara denna bild på kortet", type="primary", use_container_width=True):
+                img_b64 = process_pil_image(pil_img, rotate_degrees=current_rot)
+                if img_b64:
+                    app_data["collection"][selected_index]["Bild"] = img_b64
+                    save_data_to_github(app_data)
+                    
+                    # Rensa temporär rotation
+                    del st.session_state[rot_key]
+                    for key in list(st.session_state.keys()):
+                        if "editor" in key:
+                            del st.session_state[key]
+
+                    st.success("Bilden sparades!")
+                    st.rerun()
+    else:
+        # Nollställ rotation om filen tas bort
+        st.session_state[rot_key] = 0
+        raw_img = card_data.get("Bild", "")
+        if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
+            try:
+                if raw_img.startswith("data:image"):
+                    base64_data = raw_img.split(",")[1]
+                    img_bytes = base64.b64decode(base64_data)
+                    st.image(Image.open(io.BytesIO(img_bytes)), width=220, caption="Nuvarande sparad bild")
+                else:
+                    st.image(raw_img, width=220, caption="Nuvarande sparad bild")
+            except Exception:
+                st.info("Ingen bild finns sparad för detta kort ännu.")
+        else:
+            st.info("Ingen bild finns sparad för detta kort ännu.")
 
 # --- HUVUDLAYOUT ---
 tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort"])
@@ -360,7 +398,25 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
+    if "new_card_rotation" not in st.session_state:
+        st.session_state["new_card_rotation"] = 0
+
     new_uploaded_file = st.file_uploader("🖼️ Välj bild från galleriet/filerna", type=["jpg", "jpeg", "png"], key="new_card_upload")
+
+    if new_uploaded_file:
+        pil_img_new = get_pil_from_uploaded_file(new_uploaded_file)
+        if pil_img_new:
+            col_l, col_r = st.columns(2)
+            with col_l:
+                if st.button("🔄 Rotera 90° Vänster", key="new_rot_l"):
+                    st.session_state["new_card_rotation"] = (st.session_state["new_card_rotation"] - 90) % 360
+            with col_r:
+                if st.button("🔄 Rotera 90° Höger", key="new_rot_r"):
+                    st.session_state["new_card_rotation"] = (st.session_state["new_card_rotation"] + 90) % 360
+
+            cur_rot = st.session_state["new_card_rotation"]
+            preview_new = pil_img_new.rotate(-cur_rot, expand=True) if cur_rot != 0 else pil_img_new
+            st.image(preview_new, width=200, caption=f"Förhandsvisning (Rotation: {cur_rot}°)")
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
@@ -384,7 +440,11 @@ with tab3:
             varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
         
         if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
-            img_b64 = process_uploaded_image(new_uploaded_file) if new_uploaded_file else ""
+            img_b64 = ""
+            if new_uploaded_file:
+                pil_img_new = get_pil_from_uploaded_file(new_uploaded_file)
+                if pil_img_new:
+                    img_b64 = process_pil_image(pil_img_new, rotate_degrees=st.session_state.get("new_card_rotation", 0))
             
             new_card = {
                 "Bild": img_b64,
@@ -406,6 +466,7 @@ with tab3:
             app_data["collection"].append(new_card)
             save_data_to_github(app_data)
             
+            st.session_state["new_card_rotation"] = 0
             for key in list(st.session_state.keys()):
                 if "editor" in key:
                     del st.session_state[key]
