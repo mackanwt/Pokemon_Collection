@@ -132,17 +132,20 @@ if not app_data:
 current_rate = 11.5  # EUR till SEK växelkurs
 
 # --- DIALOGRUTA FÖR ATT SKANNA BILD DIREKT PÅ EN RAD ---
-@st.dialog("📷 Ändra / Skanna bild på kort")
+@st.dialog("📷 Skanna / Välj bild för kort")
 def show_card_dialog(selected_index, card_data):
     st.write(f"**Valt kort:** {card_data.get('Namn', '')} ({card_data.get('SetBet.', '')} {card_data.get('Setnr.', '')})")
     
     if card_data.get("Bild"):
-        st.image(card_data["Bild"], caption="Nuvarande bild", width=150)
+        st.image(card_data["Bild"], caption="Nuvarande bild", width=120)
     
     st.divider()
     
-    cam_img = st.camera_input("📷 Ta nytt foto med mobilkameran")
-    file_img = st.file_uploader("Eller välj från mobilens galleri", type=["png", "jpg", "jpeg"])
+    # Metod A: Streamlits inbyggda kamera
+    cam_img = st.camera_input("1. Öppna webbkamera/direktkamera", key=f"cam_{selected_index}")
+    
+    # Metod B: Filväljare (Klicka -> Välj "Kamera" i mobilen)
+    file_img = st.file_uploader("2. Eller klicka här och välj 'Kamera'", type=["png", "jpg", "jpeg"], key=f"file_{selected_index}")
     
     new_img_str = ""
     if cam_img:
