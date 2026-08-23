@@ -160,10 +160,9 @@ def show_card_dialog(selected_index, card_data):
 # --- HUVUDLAYOUT ---
 tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till / Skanna"])
 
-# --- FLIK 1: HUVUDSAMLING & SKANNA DIREKT I TABELLEN ---
+# --- FLIK 1: HUVUDSAMLING ---
 with tab1:
     st.subheader("Min Samling")
-    st.caption("💡 *Klicka/tryck på valfri rad för att öppna kameran och skanna/ändra bild för det kortet.*")
     
     collection_df = pd.DataFrame(app_data.get("collection", []))
     
@@ -173,6 +172,7 @@ with tab1:
 
         df_display = collection_df.copy()
         
+        # Konvertera datatyper säkert
         df_display["Värde (EUR)"] = pd.to_numeric(df_display["Värde (EUR)"], errors='coerce').fillna(0.0)
         df_display["Köpt för (EUR)"] = pd.to_numeric(df_display["Köpt för (EUR)"], errors='coerce').fillna(0.0)
         df_display["Köpt för (SEK)"] = pd.to_numeric(df_display["Köpt för (SEK)"], errors='coerce').fillna(0.0)
@@ -201,21 +201,50 @@ with tab1:
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
 
-        event = st.dataframe(
-            df_display,
-            column_order=columns_order,
-            column_config=column_config,
-            use_container_width=True,
-            hide_index=True,
-            on_select="rerun",
-            selection_mode="single-row"
-        )
-
-        # När du trycker på en rad öppnas skannern för den raden!
-        if event and event.selection and event.selection.rows:
-            selected_idx = event.selection.rows[0]
-            selected_row = df_display.iloc[selected_idx]
-            show_card_dialog(selected_idx, selected_row)
+        # Din ursprungliga toggle-knapp överst
+        edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
+        
+        if edit_mode:
+            # 1. Konfiguration för data_editor (skrivbar Bild-kolumn)
+            editable_config = column_config.copy()
+            editable_config["Bild"] = st.column_config.TextColumn("Bild (URL/Base64)", width="small")
+            
+            edited_df = st.data_editor(
+                df_display,
+                column_order=columns_order,
+                column_config=editable_config,
+                num_rows="dynamic",
+                use_container_width=True,
+                key="main_collection_editor"
+            )
+            
+            st.divider()
+            
+            # 2. Skanna/Ta foto på valt kort i redigeringsläget
+            col_scan_sel, col_scan_btn = st.columns([2, 1])
+            with col_scan_sel:
+                card_list = [f"Rad {i+1}: {r.get('Namn', '')} ({r.get('Setnr.', '')})" for i, r in edited_df.iterrows()]
+                selected_card_to_scan = st.selectbox("📷 Välj kort att fotografera/skanna:", card_list)
+                selected_row_idx = card_list.index(selected_card_to_scan) if card_list else 0
+                
+            with col_scan_btn:
+                if st.button("📷 Öppna kamera för valt kort", use_container_width=True):
+                    show_card_dialog(selected_row_idx, edited_df.iloc[selected_row_idx])
+            
+            if st.button("💾 Spara alla ändringar i samlingen", type="primary", use_container_width=True):
+                app_data["collection"] = edited_df.to_dict(orient="records")
+                save_data_to_github(app_data)
+                st.success("Samlingen sparades!")
+                st.rerun()
+        else:
+            # Vanlig tabellvisning utan popup vid klick
+            st.dataframe(
+                df_display,
+                column_order=columns_order,
+                column_config=column_config,
+                use_container_width=True,
+                hide_index=True
+            )
 
         total_value_sek = df_display["Värde idag (SEK)"].sum()
         total_cost_sek = df_display["Köpt för (SEK)"].sum()
@@ -227,6 +256,7 @@ with tab1:
             st.metric("Totalt värde (SEK)", f"{total_value_sek:,.2f} kr")
         with col_profit:
             st.metric("Total vinst (SEK)", f"{total_profit_sek:,.2f} kr", delta=f"{total_profit_sek:,.2f} kr")
+
     else:
         st.info("Samlingen är tom.")
 
