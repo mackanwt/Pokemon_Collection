@@ -56,11 +56,11 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # --- HJÄLPFUNKTION FÖR BILD-OMVANDLING ---
-def process_camera_photo(photo_buffer):
-    if not photo_buffer:
+def process_image(image_input):
+    if not image_input:
         return ""
     try:
-        img = Image.open(photo_buffer)
+        img = Image.open(image_input)
         img = ImageOps.exif_transpose(img)
         img = img.convert("RGB")
         img.thumbnail((500, 500))
@@ -160,12 +160,14 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    # Inbyggd Streamlit-kamera som garanterat skickar bilden till Python
-    photo = st.camera_input("📷 Ta närbild på kortet", key=f"cam_input_{selected_index}")
+    uploaded_file = st.file_uploader("📁 Välj bild från fil/galleri", type=["jpg", "jpeg", "png"], key=f"dialog_upload_{selected_index}")
+    photo = st.camera_input("📷 Eller ta foto direkt med kameran", key=f"dialog_cam_{selected_index}")
     
-    if photo:
-        if st.button("💾 Spara tagen bild", type="primary", use_container_width=True):
-            img_b64 = process_camera_photo(photo)
+    chosen_image = photo if photo else uploaded_file
+    
+    if chosen_image:
+        if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
+            img_b64 = process_image(chosen_image)
             if img_b64:
                 app_data["collection"][selected_index]["Bild"] = img_b64
                 save_data_to_github(app_data)
@@ -354,7 +356,10 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    new_photo = st.camera_input("📷 Ta fotot för det nya kortet", key="cam_new_card")
+    new_uploaded_file = st.file_uploader("📁 Välj bild från fil/galleri", type=["jpg", "jpeg", "png"], key="new_card_upload")
+    new_photo = st.camera_input("📷 Eller ta foto direkt med kameran", key="new_card_cam")
+
+    new_chosen_image = new_photo if new_photo else new_uploaded_file
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
@@ -378,7 +383,7 @@ with tab3:
             varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
         
         if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
-            img_b64 = process_camera_photo(new_photo) if new_photo else ""
+            img_b64 = process_image(new_chosen_image) if new_chosen_image else ""
             
             new_card = {
                 "Bild": img_b64,
