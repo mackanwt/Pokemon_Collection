@@ -94,7 +94,6 @@ def custom_mobile_camera(key_id):
         reader.onload = function(e) {{
             const img = new Image();
             img.onload = function() {{
-                // Skala ner bilden till max 800px bredd/höjd direkt i mobilen
                 const canvas = document.createElement('canvas');
                 let width = img.width;
                 let height = img.height;
@@ -117,12 +116,10 @@ def custom_mobile_camera(key_id):
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // Komprimera till lätt JPEG (0.7 kvalitet)
                 const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
                 
                 document.getElementById('msg_{key_id}').innerText = "✓ Bild klar! Tryck på Spara nedan.";
 
-                // Skicka den lätta bilden till Streamlit
                 window.parent.postMessage({{
                     type: 'streamlit:setComponentValue',
                     value: compressedDataUrl
@@ -162,6 +159,16 @@ def save_data_to_github(data_dict):
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     res = requests.get(url, headers=headers)
     sha = res.json()["sha"] if res.status_code == 200 else None
+    
+    # Säkerställ att alla bildsträngar är rena strängar (JSON-kompatibla)
+    clean_collection = []
+    for item in data_dict.get("collection", []):
+        clean_item = dict(item)
+        if "Bild" in clean_item:
+            clean_item["Bild"] = str(clean_item["Bild"]) if clean_item["Bild"] is not None else ""
+        clean_collection.append(clean_item)
+    
+    data_dict["collection"] = clean_collection
     
     content_str = json.dumps(data_dict, indent=2, ensure_ascii=False)
     encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
@@ -213,15 +220,18 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    # Använd den säkra kamerakomponenten
+    # Använd kamerakomponenten
     img_data_from_cam = custom_mobile_camera(f"dialog_{selected_index}")
     
     if img_data_from_cam:
-        if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
-            app_data["collection"][selected_index]["Bild"] = img_data_from_cam
-            save_data_to_github(app_data)
-            st.success("Bilden sparades!")
-            st.rerun()
+        # Säkerställ att vi sparar som ren text
+        clean_img_str = str(img_data_from_cam)
+        if clean_img_str.startswith("data:image"):
+            if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
+                app_data["collection"][selected_index]["Bild"] = clean_img_str
+                save_data_to_github(app_data)
+                st.success("Bilden sparades!")
+                st.rerun()
 
 # --- HUVUDLAYOUT ---
 tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort"])
@@ -382,7 +392,8 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    new_card_img = custom_mobile_camera("add_new_card")
+    new_card_img_raw = custom_mobile_camera("add_new_card")
+    final_img_str = str(new_card_img_raw) if (new_card_img_raw and str(new_card_img_raw).startswith("data:image")) else ""
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
@@ -407,7 +418,7 @@ with tab3:
         
         if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
             new_card = {
-                "Bild": new_card_img if new_card_img else "",
+                "Bild": final_img_str,
                 "Pärmnummer": parm,
                 "Språk": sprak,
                 "Namn": namn,
