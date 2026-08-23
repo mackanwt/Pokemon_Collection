@@ -108,18 +108,16 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# UPPDATERAD BILDHANTERING MED EXIF-ROTERING
+# BILDHANTERING MED EXIF-ROTERING OCH UTAN BESKÄRNING
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
     
     img = Image.open(file_buffer)
-    
-    # Korrigera rotering baserat på mobilens EXIF-data
     img = ImageOps.exif_transpose(img)
     
-    # Skala om för bra skärpa utan att krascha minnet (600px höjd/bredd)
-    img.thumbnail((600, 600))
+    # Ändrad storlek som behåller hela kortets stående rektangulära form utan beskärning
+    img.thumbnail((450, 600))
     
     buffered = io.BytesIO()
     img.save(buffered, format="JPEG", quality=85)
@@ -139,13 +137,12 @@ if not app_data:
 
 current_rate = 11.5  # EUR till SEK växelkurs
 
-# UPPDATERAD DIALOGRUTA MED STOR BILD
+# DIALOGRUTA MED STOR BILD
 @st.dialog("🎴 Kortdetaljer & Skanner")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
     st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
     
-    # Stor bildvisning när du klickar på kortet
     if card_data.get("Bild"):
         st.image(card_data["Bild"], use_container_width=True)
     else:
@@ -185,7 +182,6 @@ with tab1:
 
         df_display = collection_df.copy()
         
-        # Konvertera datatyper säkert
         df_display["Värde (EUR)"] = pd.to_numeric(df_display["Värde (EUR)"], errors='coerce').fillna(0.0)
         df_display["Köpt för (EUR)"] = pd.to_numeric(df_display["Köpt för (EUR)"], errors='coerce').fillna(0.0)
         df_display["Köpt för (SEK)"] = pd.to_numeric(df_display["Köpt för (SEK)"], errors='coerce').fillna(0.0)
@@ -197,8 +193,9 @@ with tab1:
             "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
         ]
         
+        # Bildkolumnen satt till medium för att undvika beskärning på mobil
         column_config = {
-            "Bild": st.column_config.ImageColumn("Bild", width="small"),
+            "Bild": st.column_config.ImageColumn("Bild", width="medium"),
             "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
             "Språk": st.column_config.TextColumn("Språk", width="small"),
             "Namn": st.column_config.TextColumn("Namn", width="medium"),
