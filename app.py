@@ -52,19 +52,6 @@ st.markdown(f"""
         button, input, select {{
             touch-action: manipulation;
         }}
-        
-        /* FIXAR FÖRSTORINGSVY PÅ MOBIL SÅ BILDEN INTE KAPAS */
-        div[data-testid="stModal"] img,
-        div[data-testid="stImage"] img,
-        div[role="dialog"] img {{
-            object-fit: contain !important;
-            max-width: 95vw !important;
-            max-height: 85vh !important;
-            margin: auto !important;
-        }}
-        div[data-testid="stModal"] > div {{
-            padding: 0.5rem !important;
-        }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -168,7 +155,23 @@ if not app_data:
 
 current_rate = 11.5
 
-# DIALOGRUTA FÖR BILDER MED ROTERING
+# DIALOGRUTA FÖR FULLSTÄNDIG BILD
+@st.dialog("🔍 Förstorad Bild")
+def show_large_image_dialog(card_data):
+    st.markdown(f"### {card_data.get('Namn', '')}")
+    raw_img = card_data.get("Bild", "")
+    if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
+        try:
+            if raw_img.startswith("data:image"):
+                base64_data = raw_img.split(",")[1]
+                img_bytes = base64.b64decode(base64_data)
+                st.image(Image.open(io.BytesIO(img_bytes)), use_container_width=True)
+            else:
+                st.image(raw_img, use_container_width=True)
+        except Exception:
+            st.error("Kunde inte visa bilden.")
+
+# DIALOGRUTA FÖR BILDER MED ROTERING OCH FÖRSTORING
 @st.dialog("🎴 Kortdetaljer & Välj bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -220,6 +223,9 @@ def show_card_dialog(selected_index, card_data):
                     st.image(Image.open(io.BytesIO(img_bytes)), width=220, caption="Nuvarande sparad bild")
                 else:
                     st.image(raw_img, width=220, caption="Nuvarande sparad bild")
+                
+                if st.button("🔍 Förstora bilden utan beskärning", use_container_width=True):
+                    show_large_image_dialog(card_data)
             except Exception:
                 st.info("Ingen bild finns sparad för detta kort ännu.")
         else:
