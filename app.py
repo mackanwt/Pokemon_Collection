@@ -34,7 +34,7 @@ manifest_json = json.dumps(manifest_data)
 manifest_base64 = base64.b64encode(manifest_json.encode('utf-8')).decode('utf-8')
 manifest_href = f"data:application/manifest+json;base64,{manifest_base64}"
 
-# CSS FIX FÖR MOBIL OG VISNING
+# CSS FIX FÖR MOBIL
 st.markdown(f"""
     <link rel="manifest" href="{manifest_href}">
     <meta name="mobile-web-app-capable" content="yes">
@@ -52,6 +52,12 @@ st.markdown(f"""
         }}
         button, input, select {{
             touch-action: manipulation;
+        }}
+        
+        div[data-testid="stImage"] img {{
+            touch-action: pan-x pan-y !important;
+            max-width: 100% !important;
+            height: auto !important;
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -219,7 +225,6 @@ tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Läg
 # --- FLIK 1: HUVUDSAMLING ---
 with tab1:
     st.subheader("Min Samling")
-    st.caption("💡 *Dubbelklicka på en bild i tabellen för att visa den i fullskärm.*")
     
     collection_df = pd.DataFrame(app_data.get("collection", []))
     
@@ -250,9 +255,8 @@ with tab1:
             "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
         ]
         
-        # BILDEN HAR FÅTT EN FAST BREDR (120px) SÅ ATT DEN VISAS TYDLIGT I CELLEN
         column_config = {
-            "Bild": st.column_config.ImageColumn("Bild", width=120),
+            "Bild": st.column_config.ImageColumn("Bild", width="small"),
             "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
             "Språk": st.column_config.TextColumn("Språk", width="small"),
             "Namn": st.column_config.TextColumn("Namn", width="medium"),
@@ -268,14 +272,87 @@ with tab1:
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
 
-        # TABELL UTAN EXTRA VISNINGSRUTA – DUBBELKLICKA PÅ CELLEN FÖR ATT FÖRSTORA
-        st.dataframe(
-            df_display,
-            column_order=columns_order,
-            column_config=column_config,
-            use_container_width=True,
-            hide_index=True
-        )
+        edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
+        
+        if edit_mode:
+            edited_df = st.data_editor(
+                df_display,
+                column_order=columns_order,
+                column_config=column_config,
+                num_rows="dynamic",
+                use_container_width=True,
+                key="main_collection_editor"
+            )
+            
+            st.divider()
+            
+            max_rows = len(edited_df)
+            col_scan_sel, col_scan_btn = st.columns([1, 1])
+            
+            with col_scan_sel:
+                selected_row_num = st.number_input(
+                    "🖼️ Välj radnummer för bild:", 
+                    min_value=1, 
+                    max_value=max(1, max_rows), 
+                    value=1, 
+                    step=1
+                )
+                selected_row_idx = selected_row_num - 1
+
+            with col_scan_btn:
+                st.write("")
+                st.write("")
+                if st.button("🖼️ Hantera/Byt bild på valt kort", use_container_width=True):
+                    if max_rows > 0:
+                        real_card_data = app_data["collection"][selected_row_idx]
+                        show_card_dialog(selected_row_idx, real_card_data)
+            
+            st.divider()
+            if st.button("💾 Spara alla ändringar i samlingen", type="primary", use_container_width=True):
+                edited_records = edited_df.to_dict(orient="records")
+                for idx, record in enumerate(edited_records):
+                    if idx < len(app_data["collection"]):
+                        if not record.get("Bild"):
+                            record["Bild"] = app_data["collection"][idx].get("Bild", "")
+                app_data["collection"] = edited_records
+                save_data_to_github(app_data)
+                st.success("Samlingen sparades!")
+                st.rerun()
+        else:
+            st.caption("👆 *Tryck på en rad i tabellen för att visa kortbilden direkt nedanför.*")
+            # DIREKTKLICK PÅ RAD
+            event = st.dataframe(
+                df_display,
+                column_order=columns_order,
+                column_config=column_config,
+                use_container_width=True,
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row"
+            )
+
+            # DIREKTVISNING AV BILD VID KLICK
+            selected_rows = event.selection.get("rows", [])
+            if selected_rows:
+                selected_idx = selected_rows[0]
+                card_item = app_data["collection"][selected_idx]
+                raw_img = card_item.get("Bild", "")
+                
+                st.divider()
+                st.markdown(f"### 🔍 {card_item.get('Namn')} ({card_item.get('Set')})")
+                
+                if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
+                    try:
+                        if raw_img.startswith("data:image"):
+                            base64_data = raw_img.split(",")[1]
+                            img_bytes = base64.b64decode(base64_data)
+                            st.image(Image.open(io.BytesIO(img_bytes)), use_container_width=True)
+                        else:
+                            st.image(raw_img, use_container_width=True)
+                    except Exception:
+                        st.error("Kunde inte ladda bilden.")
+                else:
+                    st.info("Detta kort har ingen bild sparad ännu.")
 
         total_value_sek = df_display["Värde idag (SEK)"].sum()
         total_cost_sek = df_display["Köpt för (SEK)"].sum()
@@ -291,9 +368,9 @@ with tab1:
     else:
         st.info("Samlingen är tom.")
 
-# --- FLIK 2: REDIGERINGSLÄGE FÖR TEXT OCH BILDER ---
+# --- FLIK 2: REDIGERINGSLÄGE FÖR TEXT/DATA ---
 with tab2:
-    st.subheader("✏️ Massredigera text, värden och bilder")
+    st.subheader("✏️ Massredigera text och värden")
     collection_df = pd.DataFrame(app_data.get("collection", []))
     
     if not collection_df.empty:
@@ -305,7 +382,7 @@ with tab2:
         ]
         
         editable_config = {
-            "Bild": st.column_config.ImageColumn("Bild", width=120),
+            "Bild": st.column_config.ImageColumn("Bild", width="small"),
             "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
             "Språk": st.column_config.TextColumn("Språk", width="small"),
             "Namn": st.column_config.TextColumn("Namn", width="medium"),
@@ -327,32 +404,7 @@ with tab2:
             key="text_editor_grid"
         )
         
-        st.divider()
-        
-        max_rows = len(edited_df)
-        col_scan_sel, col_scan_btn = st.columns([1, 1])
-        
-        with col_scan_sel:
-            selected_row_num = st.number_input(
-                "🖼️ Välj radnummer för bildändring:", 
-                min_value=1, 
-                max_value=max(1, max_rows), 
-                value=1, 
-                step=1
-            )
-            selected_row_idx = selected_row_num - 1
-
-        with col_scan_btn:
-            st.write("")
-            st.write("")
-            if st.button("🖼️ Byt/rotera bild på vald rad", use_container_width=True):
-                if max_rows > 0:
-                    real_card_data = app_data["collection"][selected_row_idx]
-                    show_card_dialog(selected_row_idx, real_card_data)
-
-        st.divider()
-
-        if st.button("💾 Spara alla ändringar till GitHub", type="primary", use_container_width=True):
+        if st.button("💾 Spara alla textändringar till GitHub", type="primary"):
             edited_records = edited_df.to_dict(orient="records")
             for idx, record in enumerate(edited_records):
                 if idx < len(app_data["collection"]):
