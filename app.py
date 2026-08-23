@@ -52,10 +52,18 @@ st.markdown(f"""
         button, input, select {{
             touch-action: manipulation;
         }}
-        /* Fixar så att förstorade bilder inte kapas på mobilskärmar */
-        div[data-testid="stImage"] img, div[role="dialog"] img {{
+        
+        /* FIXAR FÖRSTORINGSVY PÅ MOBIL SÅ BILDEN INTE KAPAS */
+        div[data-testid="stModal"] img,
+        div[data-testid="stImage"] img,
+        div[role="dialog"] img {{
             object-fit: contain !important;
-            max-width: 100% !important;
+            max-width: 95vw !important;
+            max-height: 85vh !important;
+            margin: auto !important;
+        }}
+        div[data-testid="stModal"] > div {{
+            padding: 0.5rem !important;
         }}
     </style>
 """, unsafe_allow_html=True)
