@@ -67,6 +67,19 @@ st.markdown(f"""
         button, input, select {{
             touch-action: manipulation;
         }}
+        
+        /* Lås kolumnrubriker så de inte går att flytta på mobilen */
+        [data-testid="stHeader"] button,
+        div[role="columnheader"] {{
+            pointer-events: none !important;
+            touch-action: none !important;
+            user-select: none !important;
+        }}
+        
+        /* Tillåt fortfarande klick på sorteringspilar */
+        div[role="columnheader"] [data-testid="stTableSortIcon"] {{
+            pointer-events: auto !important;
+        }}
     </style>
 """, unsafe_allow_html=True)
 
