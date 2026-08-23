@@ -4,7 +4,7 @@ import json
 import base64
 import requests
 from datetime import date
-from PIL import Image, ImageOps
+from PIL import Image
 import io
 import streamlit.components.v1 as components
 
@@ -55,6 +55,10 @@ st.markdown(f"""
         }}
     </style>
 """, unsafe_allow_html=True)
+
+# --- INITIERA ETT REVISIONSPASS FÖR ATT TCKA OM CACHE NÄR BILD SPARAS ---
+if "editor_version" not in st.session_state:
+    st.session_state["editor_version"] = 0
 
 # --- SKRÄDDARSYDD KAMERA & BILD-KOMPRIMERARE FÖR MOBIL ---
 def custom_mobile_camera(key_id):
@@ -206,9 +210,9 @@ def show_card_dialog(selected_index, card_data):
             if raw_img.startswith("data:image"):
                 base64_data = raw_img.split(",")[1]
                 img_bytes = base64.b64decode(base64_data)
-                st.image(Image.open(io.BytesIO(img_bytes)))
+                st.image(Image.open(io.BytesIO(img_bytes)), use_column_width=True)
             else:
-                st.image(raw_img)
+                st.image(raw_img, use_column_width=True)
         except Exception:
             st.info("Ingen giltig bild finns sparad för detta kort ännu.")
     else:
@@ -222,15 +226,12 @@ def show_card_dialog(selected_index, card_data):
         if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
             img_str = str(img_data_from_cam)
             
-            # Uppdatera i data-strukturen
+            # Uppdatera samlingen direkt i app_data
             app_data["collection"][selected_index]["Bild"] = img_str
             save_data_to_github(app_data)
             
-            # Nollställ data_editors cache så att den nya bilden laddas in i tabellen
-            if "main_collection_editor" in st.session_state:
-                del st.session_state["main_collection_editor"]
-            if "text_editor_grid" in st.session_state:
-                del st.session_state["text_editor_grid"]
+            # Öka versionen för att tvinga tabell-redigeraren att rensa sin gamla cache
+            st.session_state["editor_version"] += 1
 
             st.success("Bilden sparades!")
             st.rerun()
@@ -291,13 +292,16 @@ with tab1:
         edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
         if edit_mode:
+            # Dynamisk nyckel som uppdateras om en ny bild sparats
+            editor_key = f"main_editor_v{st.session_state['editor_version']}"
+            
             edited_df = st.data_editor(
                 df_display,
                 column_order=columns_order,
                 column_config=column_config,
                 num_rows="dynamic",
                 use_container_width=True,
-                key="main_collection_editor"
+                key=editor_key
             )
             
             st.divider()
@@ -382,13 +386,14 @@ with tab2:
             "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
         }
 
+        text_key = f"text_editor_v{st.session_state['editor_version']}"
         edited_df = st.data_editor(
             df_display,
             column_order=columns_order,
             column_config=editable_config,
             num_rows="dynamic",
             use_container_width=True,
-            key="text_editor_grid"
+            key=text_key
         )
         
         if st.button("💾 Spara alla textändringar till GitHub", type="primary"):
@@ -446,10 +451,7 @@ with tab3:
             app_data["collection"].append(new_card)
             save_data_to_github(app_data)
             
-            if "main_collection_editor" in st.session_state:
-                del st.session_state["main_collection_editor"]
-            if "text_editor_grid" in st.session_state:
-                del st.session_state["text_editor_grid"]
+            st.session_state["editor_version"] += 1
 
             st.success(f"Kortet {namn} skapades och sparades!")
             st.rerun()
