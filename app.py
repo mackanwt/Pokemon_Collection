@@ -6,7 +6,6 @@ import requests
 from datetime import date
 from PIL import Image
 import io
-import streamlit.components.v1 as components
 
 # --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -56,82 +55,23 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- INITIERA ETT REVISIONSPASS FÖR ATT TCKA OM CACHE NÄR BILD SPARAS ---
-if "editor_version" not in st.session_state:
-    st.session_state["editor_version"] = 0
-
-# --- SKRÄDDARSYDD KAMERA & BILD-KOMPRIMERARE FÖR MOBIL ---
-def custom_mobile_camera(key_id):
-    html_code = f"""
-    <div style="font-family: system-ui, -apple-system, sans-serif; text-align: center;">
-        <label for="input_{key_id}" style="
-            background-color: #0068c9;
-            color: white;
-            padding: 12px 18px;
-            border-radius: 8px;
-            cursor: pointer;
-            display: inline-block;
-            font-weight: 600;
-            font-size: 15px;
-            width: 100%;
-            box-sizing: border-box;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        ">
-            📷 Ta närbild med kameran / Välj bild
-        </label>
-        <input type="file" id="input_{key_id}" accept="image/*" capture="environment" style="display:none;" onchange="handleFile(event)">
-        <div id="msg_{key_id}" style="margin-top: 6px; font-size: 13px; color: #28a745; font-weight: bold;"></div>
-    </div>
-
-    <script>
-    function handleFile(event) {{
-        const file = event.target.files[0];
-        if (!file) return;
-
-        document.getElementById('msg_{key_id}').innerText = "Behandlar bild...";
-
-        const reader = new FileReader();
-        reader.onload = function(e) {{
-            const img = new Image();
-            img.onload = function() {{
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-                const max_size = 800;
-
-                if (width > height) {{
-                    if (width > max_size) {{
-                        height *= max_size / width;
-                        width = max_size;
-                    }}
-                }} else {{
-                    if (height > max_size) {{
-                        width *= max_size / height;
-                        height = max_size;
-                    }}
-                }}
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                
-                document.getElementById('msg_{key_id}').innerText = "✓ Bild klar! Tryck på Spara nedan.";
-
-                window.parent.postMessage({{
-                    type: 'streamlit:setComponentValue',
-                    value: compressedDataUrl
-                }}, '*');
-            }};
-            img.src = e.target.result;
-        }};
-        reader.readAsDataURL(file);
-    }}
-    </script>
-    """
-    return components.html(html_code, height=90)
+# --- HJÄLPFUNKTION FÖR ATT HANTERA OCH KOMPRIMERA BILDER ---
+def compress_and_convert_image(uploaded_file):
+    """Tar en uppladdad/tagen bild, förminskar den till max 600px och gör om till Base64."""
+    if uploaded_file is None:
+        return ""
+    try:
+        img = Image.open(uploaded_file)
+        img = img.convert("RGB")
+        img.thumbnail((600, 600))  # Minskar storleken så att tabellen och GitHub orkar med den
+        
+        buffered = io.BytesIO()
+        img.save(buffered, format="JPEG", quality=65)
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        return f"data:image/jpeg;base64,{img_str}"
+    except Exception as e:
+        st.error(f"Ett fel uppstod vid bildbehandling: {e}")
+        return ""
 
 # --- GITHUB INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
@@ -163,15 +103,13 @@ def save_data_to_github(data_dict):
     clean_collection = []
     for item in data_dict.get("collection", []):
         clean_item = dict(item)
-        if "Bild" in clean_item:
-            val = str(clean_item["Bild"]) if clean_item["Bild"] is not None else ""
-            if not (val.startswith("data:image") or val.startswith("http")):
-                val = ""
-            clean_item["Bild"] = val
+        val = str(clean_item.get("Bild", "")).strip()
+        if not (val.startswith("data:image") or val.startswith("http")):
+            val = ""
+        clean_item["Bild"] = val
         clean_collection.append(clean_item)
     
     data_dict["collection"] = clean_collection
-    
     content_str = json.dumps(data_dict, indent=2, ensure_ascii=False)
     encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
     
@@ -209,32 +147,34 @@ def show_card_dialog(selected_index, card_data):
         try:
             if raw_img.startswith("data:image"):
                 base64_data = raw_img.split(",")[1]
-                img_bytes = base64.b64decode(base64_data)
-                st.image(Image.open(io.BytesIO(img_bytes)), use_column_width=True)
+                st.image(Image.open(io.BytesIO(base64.b64decode(base64_data))), width=250)
             else:
-                st.image(raw_img, use_column_width=True)
+                st.image(raw_img, width=250)
         except Exception:
-            st.info("Ingen giltig bild finns sparad för detta kort ännu.")
+            st.info("Kunde inte visa den sparade bilden.")
     else:
         st.info("Ingen bild finns sparad för detta kort ännu.")
     
     st.divider()
     
-    img_data_from_cam = custom_mobile_camera(f"dialog_{selected_index}")
+    st.markdown("**Ta ny närbild eller välj en bild från mobilen:**")
+    uploaded_file = st.file_uploader("Välj bild / Kamera", type=["jpg", "jpeg", "png"], key=f"dialog_up_{selected_index}")
     
-    if img_data_from_cam:
-        if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
-            img_str = str(img_data_from_cam)
-            
-            # Uppdatera samlingen direkt i app_data
-            app_data["collection"][selected_index]["Bild"] = img_str
-            save_data_to_github(app_data)
-            
-            # Öka versionen för att tvinga tabell-redigeraren att rensa sin gamla cache
-            st.session_state["editor_version"] += 1
+    if uploaded_file is not None:
+        new_img_b64 = compress_and_convert_image(uploaded_file)
+        if new_img_b64:
+            st.image(uploaded_file, caption="Förhandsvisning", width=200)
+            if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
+                app_data["collection"][selected_index]["Bild"] = new_img_b64
+                save_data_to_github(app_data)
+                
+                # Rensa alla cacher så tabellen läser in bilden direkt
+                for k in list(st.session_state.keys()):
+                    if "editor" in k:
+                        del st.session_state[k]
 
-            st.success("Bilden sparades!")
-            st.rerun()
+                st.success("Bilden sparades framgångsrikt!")
+                st.rerun()
 
 # --- HUVUDLAYOUT ---
 tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort"])
@@ -292,16 +232,13 @@ with tab1:
         edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
         if edit_mode:
-            # Dynamisk nyckel som uppdateras om en ny bild sparats
-            editor_key = f"main_editor_v{st.session_state['editor_version']}"
-            
             edited_df = st.data_editor(
                 df_display,
                 column_order=columns_order,
                 column_config=column_config,
                 num_rows="dynamic",
                 use_container_width=True,
-                key=editor_key
+                key="main_collection_editor"
             )
             
             st.divider()
@@ -386,14 +323,13 @@ with tab2:
             "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
         }
 
-        text_key = f"text_editor_v{st.session_state['editor_version']}"
         edited_df = st.data_editor(
             df_display,
             column_order=columns_order,
             column_config=editable_config,
             num_rows="dynamic",
             use_container_width=True,
-            key=text_key
+            key="text_editor_grid"
         )
         
         if st.button("💾 Spara alla textändringar till GitHub", type="primary"):
@@ -406,8 +342,11 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    new_card_img_raw = custom_mobile_camera("add_new_card")
-    final_img_str = str(new_card_img_raw) if new_card_img_raw else ""
+    st.markdown("**📷 Ta närbild eller välj bild för det nya kortet:**")
+    new_uploaded_file = st.file_uploader("Välj bild / Kamera för nytt kort", type=["jpg", "jpeg", "png"], key="new_card_up")
+    
+    if new_uploaded_file:
+        st.image(new_uploaded_file, caption="Förhandsvisning", width=150)
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
@@ -431,6 +370,8 @@ with tab3:
             varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
         
         if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
+            final_img_str = compress_and_convert_image(new_uploaded_file) if new_uploaded_file else ""
+            
             new_card = {
                 "Bild": final_img_str,
                 "Pärmnummer": parm,
@@ -451,7 +392,9 @@ with tab3:
             app_data["collection"].append(new_card)
             save_data_to_github(app_data)
             
-            st.session_state["editor_version"] += 1
+            for k in list(st.session_state.keys()):
+                if "editor" in k:
+                    del st.session_state[k]
 
             st.success(f"Kortet {namn} skapades och sparades!")
             st.rerun()
