@@ -55,17 +55,24 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- HJÄLPFUNKTION FÖR BILD-OMVANDLING ---
+# --- HJÄLPFUNKTION FÖR BILD-OMVANDLING (MED KORREKT ROTATION) ---
 def process_uploaded_image(file_buffer):
     if not file_buffer:
         return ""
     try:
         img = Image.open(file_buffer)
-        img = ImageOps.exif_transpose(img)
+        
+        # Återställer rätt rotation utifrån mobilens EXIF-data
+        try:
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+
         img = img.convert("RGB")
         img.thumbnail((600, 600))
         
         buffered = io.BytesIO()
+        # Sparar utan EXIF-taggar så att alla webbläsare visar bilden rätt direkt
         img.save(buffered, format="JPEG", quality=75)
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
         return f"data:image/jpeg;base64,{img_str}"
