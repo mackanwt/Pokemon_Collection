@@ -110,13 +110,13 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# BILDHANTERING MED EFFEKTIV MINNESHANTERING FÖR NÄRBILDER
+# BILDHANTERING MED MINNESOPTIMERING FÖR TÅLIGHET VID NÄRBILDER
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
     
     try:
-        # Läs in filen säkert via BytesIO för att undvika minneskrasch vid höga detaljer
+        # Läs in filen via BytesIO för att hantera högupplösta detaljer utan krasch
         bytes_data = file_buffer.getvalue()
         img = Image.open(io.BytesIO(bytes_data))
         
@@ -126,11 +126,11 @@ def process_uploaded_image(file_buffer):
         if img.mode != "RGB":
             img = img.convert("RGB")
             
-        # Skala ner till max 500px bredd för att spara RAM-minne
+        # Skala ner till max 500px bredd
         img.thumbnail((500, 700), Image.Resampling.LANCZOS)
         
         buffered = io.BytesIO()
-        # Spara med 65% kvalitet för att inte överbelasta minnet
+        # Spara med 65% kvalitet för att inte spara för tung base64-kod
         img.save(buffered, format="JPEG", quality=65, optimize=True)
         img_str = base64.b64encode(buffered.getvalue()).decode()
         return f"data:image/jpeg;base64,{img_str}"
@@ -175,10 +175,10 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
+    # type="image" behålls för att trigga valet (Kamera vs Galleri) på mobilen
     up_file = st.file_uploader(
-        "📷 Ta ett kort eller välj bild", 
-        type=["jpg", "jpeg", "png", "heic", "webp"], 
-        accept_multiple_files=False,
+        "Välj eller ta en bild", 
+        type="image", 
         key=f"dialog_file_{selected_index}"
     )
     
@@ -350,7 +350,7 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    f_img = st.file_uploader("📷 Ta ett kort eller välj bild", type=["jpg", "jpeg", "png", "heic", "webp"], accept_multiple_files=False, key="add_new_uploader")
+    f_img = st.file_uploader("Välj eller ta bild på kortet", type="image", key="add_new_uploader")
     final_img_str = process_uploaded_image(f_img) if f_img else ""
 
     with st.form("add_new_card_form"):
