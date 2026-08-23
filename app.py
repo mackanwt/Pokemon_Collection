@@ -110,7 +110,7 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# BILDHANTERING MED MINNESOPTIMERING
+# SÄKER BILDHANTERING FÖR ATT UNDVIKA KRASCH VID NÄRBILDER
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
@@ -124,6 +124,7 @@ def process_uploaded_image(file_buffer):
         if img.mode != "RGB":
             img = img.convert("RGB")
             
+        # Skala ner upplösningen så att tunga detaljer från närbilder inte kraschar appen
         img.thumbnail((600, 800), Image.Resampling.LANCZOS)
         
         buffered = io.BytesIO()
@@ -171,11 +172,15 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    # Direkt live-kamera
-    camera_pic = st.camera_input("📷 Ta fotot direkt i appen", key=f"dialog_cam_{selected_index}")
+    # Tillåtna bildtyper som aktiverar kameramenyn i mobilen
+    up_file = st.file_uploader(
+        "📷 Ta ett foto eller välj från galleri", 
+        type=["png", "jpg", "jpeg", "heic", "webp"], 
+        key=f"dialog_file_{selected_index}"
+    )
     
-    if camera_pic:
-        new_img_str = process_uploaded_image(camera_pic)
+    if up_file:
+        new_img_str = process_uploaded_image(up_file)
         if new_img_str:
             if st.button("💾 Spara bild", type="primary", use_container_width=True):
                 app_data["collection"][selected_index]["Bild"] = new_img_str
@@ -342,9 +347,12 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    # Direkt live-kamera för nya kort
-    cam_file = st.camera_input("📷 Ta foto på kortet", key="add_new_cam")
-    final_img_str = process_uploaded_image(cam_file) if cam_file else ""
+    f_img = st.file_uploader(
+        "📷 Ta ett foto eller välj bild på kortet", 
+        type=["png", "jpg", "jpeg", "heic", "webp"], 
+        key="add_new_uploader"
+    )
+    final_img_str = process_uploaded_image(f_img) if f_img else ""
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
