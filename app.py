@@ -32,7 +32,7 @@ manifest_data = {
 
 manifest_json = json.dumps(manifest_data)
 manifest_base64 = base64.b64encode(manifest_json.encode('utf-8')).decode('utf-8')
-manifest_href = f"data:application/manifest+json;base64,{manifest_href}"
+manifest_href = f"data:application/manifest+json;base64,{manifest_base64}"
 
 # CSS FIX FÖR MOBIL (Scroll i sidled + flyttar upp overlay från bottenknapparna)
 st.markdown(f"""
