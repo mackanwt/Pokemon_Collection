@@ -321,7 +321,6 @@ with tab1:
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            st.caption("👆 *Tryck på en rad i tabellen för att visa kortbilden direkt nedanför redigeringsknappen.*")
             # DIREKTKLICK PÅ RAD
             event = st.dataframe(
                 df_display,
