@@ -143,51 +143,46 @@ st.caption(f"Dagens EUR/SEK-kurs: **{current_rate:.2f} kr**")
 
 tab1, tab2, tab3 = st.tabs(["📦 Samling", "➕ Lägg till / Skanna", "⚙️ Hantera Sets"])
 
-# --- FLIK 1: HUVUDSAMLING ---
+# --- FLIK 1: HUVUDSAMLING (KORT-GALLERI MELLAN MOBIL & DATOR) ---
 with tab1:
     st.subheader("Min Samling")
     
     collection_df = pd.DataFrame(app_data.get("collection", []))
     
     if not collection_df.empty:
-        # Säkerställ att 'Bild'-kolumnen finns
         if "Bild" not in collection_df.columns:
             collection_df.insert(0, "Bild", "")
             
         df_display = collection_df.copy()
         df_display["Värde idag (SEK)"] = (df_display["Värde (EUR)"] * current_rate).round(2)
-        
-        # Ordning med Bild längst till vänster
-        columns_order = [
-            "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
-            "Övrigt", "Skick", "Köpt för (EUR)", "Köpt för (SEK)", 
-            "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
-        ]
-        
-        column_config = {
-            "Bild": st.column_config.ImageColumn("Bild", width="small"),
-            "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
-            "Språk": st.column_config.TextColumn("Språk", width="small"),
-            "Namn": st.column_config.TextColumn("Namn", width="medium"),
-            "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
-            "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
-            "Set": st.column_config.TextColumn("Set", width="large"),
-            "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
-            "Skick": st.column_config.TextColumn("Skick", width="small"),
-            "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", width="small", format="%.2f"),
-            "Köpt för (SEK)": st.column_config.NumberColumn("Köpt (SEK)", width="small", disabled=True, format="%.2f"),
-            "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
-            "Datum tillagd": st.column_config.DateColumn("Datum", width="small"),
-            "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
-        }
 
-        edit_mode = st.toggle("✏️ Redigeringsläge (Krävs för att spara ändringar)", value=False)
+        # Dialog-funktion för att förstora bilden vid klick
+        @st.dialog("🎴 Kortvisare")
+        def show_card_modal(row):
+            if row.get("Bild") and str(row["Bild"]).strip() != "":
+                st.image(row["Bild"], use_column_width=True)
+            else:
+                st.info("Ingen bild finns skannad för detta kort.")
+            st.markdown(f"### {row['Namn']}")
+            st.write(f"**Set:** {row['Set']} ({row['Setnr.']})")
+            st.write(f"**Skick:** {row['Skick']} | **Språk:** {row['Språk']}")
+            st.write(f"**Värde:** {row['Värde idag (SEK)']} kr ({row['Värde (EUR)']} EUR)")
+
+        edit_mode = st.toggle("✏️ Redigeringsläge (Klassisk Tabell)", value=False)
         
         if edit_mode:
-            # I redigeringsläge ändrar vi Bild till TextColumn för URL/Base64-hantering
-            editable_config = column_config.copy()
-            editable_config["Bild"] = st.column_config.TextColumn("Bild (URL / Base64)", width="small")
-            
+            # Redigeringsläge sparar ändringar precis som förut
+            columns_order = [
+                "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
+                "Övrigt", "Skick", "Köpt för (EUR)", "Köpt för (SEK)", 
+                "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
+            ]
+            editable_config = {
+                "Bild": st.column_config.TextColumn("Bild (URL/Base64)", width="small"),
+                "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
+                "Namn": st.column_config.TextColumn("Namn", width="medium"),
+                "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
+            }
             edited_df = st.data_editor(
                 df_display,
                 column_order=columns_order,
@@ -196,53 +191,38 @@ with tab1:
                 use_container_width=True,
                 key="main_collection_editor"
             )
-            
             if st.button("💾 Spara ändringar i samlingen", type="primary", use_container_width=True):
                 app_data["collection"] = edited_df.to_dict(orient="records")
                 save_data_to_github(app_data)
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            st.dataframe(
-                df_display,
-                column_order=columns_order,
-                column_config=column_config,
-                use_container_width=True,
-                hide_index=True
-            )
+            # App-visning: Klicka direkt på ikonen/bilden för att förstora
+            for idx, row in df_display.iterrows():
+                col_img, col_info, col_btn = st.columns([1, 4, 1])
+                
+                with col_img:
+                    img_src = row.get("Bild", "")
+                    if img_src and str(img_src).strip() != "":
+                        st.image(img_src, width=55)
+                    else:
+                        st.write("🖼️ *Saknas*")
 
-        # FÖRSTORA BILD / INTERAKTIV KORTVISARE
-        st.divider()
-        st.subheader("🔍 Klicka för att förstora bild på kort")
-        
-        cards_with_img = [f"{i+1}: {row['Namn']} ({row['Setnr.']})" for i, row in df_display.iterrows()]
-        selected_card_str = st.selectbox("Välj kort att granska i fullstorlek:", ["-- Välj kort --"] + cards_with_img)
-        
-        if selected_card_str != "-- Välj kort --":
-            idx = int(selected_card_str.split(":")[0]) - 1
-            selected_row = df_display.iloc[idx]
-            
-            img_src = selected_row.get("Bild", "")
-            col_img, col_info = st.columns([1, 2])
-            
-            with col_img:
-                if img_src and str(img_src).strip() != "":
-                    st.image(img_src, caption=f"{selected_row['Namn']} - {selected_row['Set']}", use_column_width=True)
-                else:
-                    st.info("Ingen bild skannad för detta kort ännu.")
-            
-            with col_info:
-                st.markdown(f"### {selected_row['Namn']}")
-                st.write(f"**Set:** {selected_row['Set']} ({selected_row['Setnr.']})")
-                st.write(f"**Skick:** {selected_row['Skick']} | **Språk:** {selected_row['Språk']}")
-                st.write(f"**Värde idag:** {selected_row['Värde idag (SEK)']} kr ({selected_row['Värde (EUR)']} EUR)")
+                with col_info:
+                    st.write(f"**#{row['Pärmnummer']} {row['Namn']}** ({row['Språk']}) — {row['SetBet.']} #{row['Setnr.']}")
+                    st.caption(f"Skick: {row['Skick']} | Värde: {row['Värde idag (SEK)']} kr ({row['Värde (EUR)']} EUR)")
 
-        # Totalsummeringar längst ned
+                with col_btn:
+                    if st.button("🔍 Förstora", key=f"zoom_{idx}"):
+                        show_card_modal(row)
+                
+                st.divider()
+
+        # Totalsummeringar
         total_value_sek = df_display["Värde idag (SEK)"].sum()
         total_cost_sek = df_display["Köpt för (SEK)"].sum()
         total_profit_sek = total_value_sek - total_cost_sek
 
-        st.divider()
         col_val, col_profit = st.columns(2)
         with col_val:
             st.metric("Totalt värde (SEK)", f"{total_value_sek:,.2f} kr")
