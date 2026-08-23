@@ -110,22 +110,28 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# BILDHANTERING MED OPTIMERING
+# BILDHANTERING MED EFFEKTIV MINNESHANTERING FÖR NÄRBILDER
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
     
     try:
-        img = Image.open(file_buffer)
+        # Läs in filen säkert via BytesIO för att undvika minneskrasch vid höga detaljer
+        bytes_data = file_buffer.getvalue()
+        img = Image.open(io.BytesIO(bytes_data))
+        
+        # Orientera rätt baserat på mobilens EXIF-data
         img = ImageOps.exif_transpose(img)
         
         if img.mode != "RGB":
             img = img.convert("RGB")
             
-        img.thumbnail((450, 600), Image.Resampling.LANCZOS)
+        # Skala ner till max 500px bredd för att spara RAM-minne
+        img.thumbnail((500, 700), Image.Resampling.LANCZOS)
         
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=75, optimize=True)
+        # Spara med 65% kvalitet för att inte överbelasta minnet
+        img.save(buffered, format="JPEG", quality=65, optimize=True)
         img_str = base64.b64encode(buffered.getvalue()).decode()
         return f"data:image/jpeg;base64,{img_str}"
     except Exception as e:
@@ -169,10 +175,10 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    # type="image" tvingar mobilen att visa valet "Ta kort / Galleri"
     up_file = st.file_uploader(
-        "Välj eller ta en bild", 
-        type="image", 
+        "📷 Ta ett kort eller välj bild", 
+        type=["jpg", "jpeg", "png", "heic", "webp"], 
+        accept_multiple_files=False,
         key=f"dialog_file_{selected_index}"
     )
     
@@ -344,8 +350,7 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    # type="image" ger mobilen valet mellan Kamera och Galleri
-    f_img = st.file_uploader("Välj eller ta bild på kortet", type="image", key="add_new_uploader")
+    f_img = st.file_uploader("📷 Ta ett kort eller välj bild", type=["jpg", "jpeg", "png", "heic", "webp"], accept_multiple_files=False, key="add_new_uploader")
     final_img_str = process_uploaded_image(f_img) if f_img else ""
 
     with st.form("add_new_card_form"):
