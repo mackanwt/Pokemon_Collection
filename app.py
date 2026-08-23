@@ -205,6 +205,11 @@ with tab1:
             collection_df.insert(0, "Bild", "")
 
         df_display = collection_df.copy()
+        
+        # Konvertera datatyper säkert för Streamlit
+        df_display["Värde (EUR)"] = pd.to_numeric(df_display["Värde (EUR)"], errors='coerce').fillna(0.0)
+        df_display["Köpt för (EUR)"] = pd.to_numeric(df_display["Köpt för (EUR)"], errors='coerce').fillna(0.0)
+        df_display["Köpt för (SEK)"] = pd.to_numeric(df_display["Köpt för (SEK)"], errors='coerce').fillna(0.0)
         df_display["Värde idag (SEK)"] = (df_display["Värde (EUR)"] * current_rate).round(2)
         
         columns_order = [
@@ -213,6 +218,7 @@ with tab1:
             "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
         ]
         
+        # Bas-konfiguration för tabellvisning
         column_config = {
             "Bild": st.column_config.ImageColumn("Bild", width="small"),
             "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
@@ -226,13 +232,14 @@ with tab1:
             "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", width="small", format="%.2f"),
             "Köpt för (SEK)": st.column_config.NumberColumn("Köpt (SEK)", width="small", disabled=True, format="%.2f"),
             "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
-            "Datum tillagd": st.column_config.DateColumn("Datum", width="small"),
+            "Datum tillagd": st.column_config.TextColumn("Datum", width="small"),
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
 
         edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
         if edit_mode:
+            # Skapa en helt säker konfiguration för data_editor (ändrar Bild till TextColumn)
             editable_config = column_config.copy()
             editable_config["Bild"] = st.column_config.TextColumn("Bild (URL/Base64)", width="small")
             
@@ -251,7 +258,6 @@ with tab1:
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            # Visar din exakta ursprungliga tabell med bildkolumnen längst till vänster
             event = st.dataframe(
                 df_display,
                 column_order=columns_order,
@@ -262,7 +268,6 @@ with tab1:
                 selection_mode="single-row"
             )
 
-            # När du klickar på raden/bilden i tabellen öppnas förstoringsfönstret automatiskt
             if event and event.selection and event.selection.rows:
                 selected_idx = event.selection.rows[0]
                 selected_row = df_display.iloc[selected_idx]
