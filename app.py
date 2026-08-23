@@ -137,14 +137,14 @@ if not app_data:
 
 current_rate = 11.5  # EUR till SEK växelkurs
 
-# DIALOGRUTA MED STOR BILD (Återställd file_uploader utan strikt type)
+# DIALOGRUTA MED STOR BILD (Säkerställd st.image utan krasch)
 @st.dialog("🎴 Kortdetaljer & Skanner")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
     st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
     
     if card_data.get("Bild"):
-        st.image(card_data["Bild"], use_container_width=True)
+        st.image(card_data["Bild"], use_column_width=True)
     else:
         st.info("Ingen bild finns sparad för detta kort ännu.")
     
@@ -153,7 +153,6 @@ def show_card_dialog(selected_index, card_data):
     st.markdown("**📷 Byt / Skanna bild för detta kort:**")
     cam_img = st.camera_input("Öppna kamera", key=f"cam_{selected_index}")
     
-    # Inget 'type'-argument gör att Android återigen visar valet Kamera/Galleri/Filer
     file_img = st.file_uploader("Välj bild eller ta ett nytt foto", key=f"file_{selected_index}")
     
     new_img_str = ""
