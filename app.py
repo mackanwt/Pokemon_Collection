@@ -32,9 +32,9 @@ manifest_data = {
 
 manifest_json = json.dumps(manifest_data)
 manifest_base64 = base64.b64encode(manifest_json.encode('utf-8')).decode('utf-8')
-manifest_href = f"data:application/manifest+json;base64,{manifest_base64}"
+manifest_href = f"data:application/manifest+json;base64,{manifest_href}"
 
-# Global CSS för att tvinga mobilen att ALDRIG beskära bilder samt anpassa dialogrutor för mobil
+# CSS FIX FÖR MOBIL (Scroll i sidled + flyttar upp overlay från bottenknapparna)
 st.markdown(f"""
     <link rel="manifest" href="{manifest_href}">
     <meta name="mobile-web-app-capable" content="yes">
@@ -53,17 +53,34 @@ st.markdown(f"""
         button, input, select {{
             touch-action: manipulation;
         }}
-        /* Tvinga alla Streamlit-bilder på mobil att behålla bildförhållandet utan beskärning */
-        div[data-testid="stImage"] img {{
-            object-fit: contain !important;
-            max-height: 80vh !important;
-            width: 100% !important;
+        
+        /* FIX FÖR BILDVISAREN (LIGHTBOX) PÅ MOBIL */
+        /* 1. Tillåt både vertikal och horisontell scroll/panorering */
+        div[data-testid="stImage"] img, div[role="dialog"], [data-baseweb="modal"] {{
+            touch-action: pan-x pan-y !important;
         }}
-        /* Gör dialogrutan mer mobilvänlig */
+        
+        /* 2. Flytta upp overlay-rutan så att den inte täcks av bottenmenyerna och tillåt sid-scroll */
         div[role="dialog"] {{
-            width: 95vw !important;
-            max-width: 100vw !important;
-            padding: 0.5rem !important;
+            max-height: 75vh !important;
+            margin-bottom: 70px !important;
+            overflow-x: auto !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }}
+
+        /* 3. Tvinga bildbehållaren att kunna scrollas i sidled om den täcker skärmen */
+        div[data-testid="stImage"] {{
+            overflow-x: auto !important;
+            overflow-y: auto !important;
+            max-height: 70vh !important;
+            padding-bottom: 20px !important;
+        }}
+
+        div[data-testid="stImage"] > img {{
+            max-width: none !important; /* Tillåter bilden att dras ut i sidled */
+            max-height: 70vh !important;
+            object-fit: contain !important;
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -278,7 +295,7 @@ with tab1:
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
 
-        # BILDVISARE FÖR MOBIL (Säkerställer full bildvisning utan modal-begränsningar)
+        # BILDVISARE FÖR MOBIL
         with st.expander("🔎 Klicka här för att förstora ett kort (Mobilanpassat)", expanded=False):
             card_names = [f"Rad {i+1}: {c.get('Namn', '')} ({c.get('Setnr.', '')})" for i, c in enumerate(app_data.get("collection", []))]
             if card_names:
