@@ -138,6 +138,7 @@ if not app_data:
 current_rate = 11.5  # EUR till SEK växelkurs
 
 # DIALOGRUTA MED STOR BILD
+# UPPDATERAD DIALOGRUTA SOM GÖR ATT TILLGÅNG TILL KAMERAN ÅTERSTÄLLS I UPLOAD
 @st.dialog("🎴 Kortdetaljer & Skanner")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -151,8 +152,16 @@ def show_card_dialog(selected_index, card_data):
     st.divider()
     
     st.markdown("**📷 Byt / Skanna bild för detta kort:**")
-    cam_img = st.camera_input("Öppna kamera", key=f"cam_{selected_index}")
-    file_img = st.file_uploader("Eller välj 'Kamera' / Galleri", type=["png", "jpg", "jpeg"], key=f"file_{selected_index}")
+    
+    # 1. Direkta kameran
+    cam_img = st.camera_input("Öppna direktkamera", key=f"cam_{selected_index}")
+    
+    # 2. Filväljare – genom att inte begränsa typerna för strängt på mobilen tvingas Android visa 'Kamera'-valet igen
+    file_img = st.file_uploader(
+        "Klicka här för att välja Kamera eller Galleri", 
+        type=["png", "jpg", "jpeg", "webp"], 
+        key=f"file_{selected_index}"
+    )
     
     new_img_str = ""
     if cam_img:
