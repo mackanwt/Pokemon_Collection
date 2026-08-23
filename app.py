@@ -34,7 +34,7 @@ manifest_json = json.dumps(manifest_data)
 manifest_base64 = base64.b64encode(manifest_json.encode('utf-8')).decode('utf-8')
 manifest_href = f"data:application/manifest+json;base64,{manifest_base64}"
 
-# CSS FIX FÖR MOBIL (Scroll i sidled + flyttar upp overlay från bottenknapparna)
+# CSS FIX FÖR MOBIL
 st.markdown(f"""
     <link rel="manifest" href="{manifest_href}">
     <meta name="mobile-web-app-capable" content="yes">
@@ -54,33 +54,11 @@ st.markdown(f"""
             touch-action: manipulation;
         }}
         
-        /* FIX FÖR BILDVISAREN (LIGHTBOX) PÅ MOBIL */
-        /* 1. Tillåt både vertikal och horisontell scroll/panorering */
-        div[data-testid="stImage"] img, div[role="dialog"], [data-baseweb="modal"] {{
+        /* Tillåt scroll i sidled och anpassa bildvisning för mobil */
+        div[data-testid="stImage"] img {{
             touch-action: pan-x pan-y !important;
-        }}
-        
-        /* 2. Flytta upp overlay-rutan så att den inte täcks av bottenmenyerna och tillåt sid-scroll */
-        div[role="dialog"] {{
-            max-height: 75vh !important;
-            margin-bottom: 70px !important;
-            overflow-x: auto !important;
-            overflow-y: auto !important;
-            -webkit-overflow-scrolling: touch !important;
-        }}
-
-        /* 3. Tvinga bildbehållaren att kunna scrollas i sidled om den täcker skärmen */
-        div[data-testid="stImage"] {{
-            overflow-x: auto !important;
-            overflow-y: auto !important;
-            max-height: 70vh !important;
-            padding-bottom: 20px !important;
-        }}
-
-        div[data-testid="stImage"] > img {{
-            max-width: none !important; /* Tillåter bilden att dras ut i sidled */
-            max-height: 70vh !important;
-            object-fit: contain !important;
+            max-width: 100% !important;
+            height: auto !important;
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -185,7 +163,7 @@ if not app_data:
 
 current_rate = 11.5
 
-# DIALOGRUTA FÖR BILDER MED ROTERING
+# DIALOGRUTA FÖR BILDER MED ROTERING (Vid redigering)
 @st.dialog("🎴 Kortdetaljer & Välj bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -295,26 +273,6 @@ with tab1:
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
 
-        # BILDVISARE FÖR MOBIL
-        with st.expander("🔎 Klicka här för att förstora ett kort (Mobilanpassat)", expanded=False):
-            card_names = [f"Rad {i+1}: {c.get('Namn', '')} ({c.get('Setnr.', '')})" for i, c in enumerate(app_data.get("collection", []))]
-            if card_names:
-                selected_card_idx = st.selectbox("Välj kort att titta på:", range(len(card_names)), format_func=lambda x: card_names[x])
-                card_item = app_data["collection"][selected_card_idx]
-                raw_img = card_item.get("Bild", "")
-                if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
-                    try:
-                        if raw_img.startswith("data:image"):
-                            base64_data = raw_img.split(",")[1]
-                            img_bytes = base64.b64decode(base64_data)
-                            st.image(Image.open(io.BytesIO(img_bytes)), caption=f"{card_item.get('Namn')} - {card_item.get('Set')}")
-                        else:
-                            st.image(raw_img, caption=f"{card_item.get('Namn')} - {card_item.get('Set')}")
-                    except Exception:
-                        st.error("Kunde inte ladda bilden.")
-                else:
-                    st.info("Detta kort har ingen bild sparad ännu.")
-
         edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
         if edit_mode:
@@ -366,13 +324,39 @@ with tab1:
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            st.dataframe(
+            # KLICKA PÅ RAD I TABELLEN FÖR ATT VISA BILD DIREKT
+            event = st.dataframe(
                 df_display,
                 column_order=columns_order,
                 column_config=column_config,
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row"
             )
+
+            # NÄR EN RAD KLICKAS VISAS BILDEN DIREKT NEDANFÖR
+            selected_rows = event.selection.get("rows", [])
+            if selected_rows:
+                selected_idx = selected_rows[0]
+                card_item = app_data["collection"][selected_idx]
+                raw_img = card_item.get("Bild", "")
+                
+                st.divider()
+                st.markdown(f"### 🔍 {card_item.get('Namn')} ({card_item.get('Set')})")
+                
+                if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
+                    try:
+                        if raw_img.startswith("data:image"):
+                            base64_data = raw_img.split(",")[1]
+                            img_bytes = base64.b64decode(base64_data)
+                            st.image(Image.open(io.BytesIO(img_bytes)), use_column_width=True)
+                        else:
+                            st.image(raw_img, use_column_width=True)
+                    except Exception:
+                        st.error("Kunde inte ladda bilden.")
+                else:
+                    st.info("Detta kort har ingen bild sparad ännu.")
 
         total_value_sek = df_display["Värde idag (SEK)"].sum()
         total_cost_sek = df_display["Köpt för (SEK)"].sum()
