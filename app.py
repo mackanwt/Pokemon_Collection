@@ -110,23 +110,20 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# OPTIMERAD BILDHANTERING FÖR TÅLIGHET VID NÄRBILDER
+# BILDHANTERING MED MINNESOPTIMERING
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
     
     try:
-        # Läs in filen säkert via byte-ström för att hantera tunga detaljer
         bytes_data = file_buffer.getvalue()
         img = Image.open(io.BytesIO(bytes_data))
         
-        # Orientera rätt baserat på mobilens EXIF-data
         img = ImageOps.exif_transpose(img)
         
         if img.mode != "RGB":
             img = img.convert("RGB")
             
-        # Skala ner maximal bildupplösning hårt så att minnet inte överbelastas
         img.thumbnail((600, 800), Image.Resampling.LANCZOS)
         
         buffered = io.BytesIO()
@@ -174,15 +171,11 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    # Standardväljare med MIME-typ "image/*" för att tvinga fram Kamera/Galleri-valet
-    up_file = st.file_uploader(
-        "📷 Ta ett foto eller välj bild", 
-        type="image", 
-        key=f"dialog_file_{selected_index}"
-    )
+    # Direkt live-kamera
+    camera_pic = st.camera_input("📷 Ta fotot direkt i appen", key=f"dialog_cam_{selected_index}")
     
-    if up_file:
-        new_img_str = process_uploaded_image(up_file)
+    if camera_pic:
+        new_img_str = process_uploaded_image(camera_pic)
         if new_img_str:
             if st.button("💾 Spara bild", type="primary", use_container_width=True):
                 app_data["collection"][selected_index]["Bild"] = new_img_str
@@ -349,8 +342,9 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    f_img = st.file_uploader("📷 Ta ett foto eller välj bild på kortet", type="image", key="add_new_uploader")
-    final_img_str = process_uploaded_image(f_img) if f_img else ""
+    # Direkt live-kamera för nya kort
+    cam_file = st.camera_input("📷 Ta foto på kortet", key="add_new_cam")
+    final_img_str = process_uploaded_image(cam_file) if cam_file else ""
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
