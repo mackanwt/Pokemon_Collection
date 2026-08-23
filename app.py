@@ -52,22 +52,23 @@ st.markdown(f"""
         button, input, select {{
             touch-action: manipulation;
         }}
+        /* Fixar så att förstorade bilder inte kapas på mobilskärmar */
+        div[data-testid="stImage"] img, div[role="dialog"] img {{
+            object-fit: contain !important;
+            max-width: 100% !important;
+        }}
     </style>
 """, unsafe_allow_html=True)
 
 # --- HJÄLPFUNKTION FÖR BILD-OMVANDLING OCH ROTATION ---
 def process_pil_image(img, rotate_degrees=0):
-    """Tar en PIL-bild, tillämpar rotation, ändrar storlek och returnerar base64-sträng."""
     try:
-        # Grundläggande EXIF-orientering först
         try:
             img = ImageOps.exif_transpose(img)
         except Exception:
             pass
 
-        # Manuell rotation om användaren tryckt på rotera-knapparna
         if rotate_degrees != 0:
-            # Image.ROTATE_90, ROTATE_180, ROTATE_270 alt expand=True
             img = img.rotate(-rotate_degrees, expand=True)
 
         img = img.convert("RGB")
@@ -165,7 +166,6 @@ def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
     st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
     
-    # Initiera rotationsstatus i session state för dialogen
     rot_key = f"dialog_rotation_{selected_index}"
     if rot_key not in st.session_state:
         st.session_state[rot_key] = 0
@@ -175,7 +175,6 @@ def show_card_dialog(selected_index, card_data):
     if uploaded_file:
         pil_img = get_pil_from_uploaded_file(uploaded_file)
         if pil_img:
-            # Visa roteringsknappar
             col_left, col_right = st.columns(2)
             with col_left:
                 if st.button("🔄 Rotera 90° Vänster", key=f"rot_left_{selected_index}", use_container_width=True):
@@ -184,7 +183,6 @@ def show_card_dialog(selected_index, card_data):
                 if st.button("🔄 Rotera 90° Höger", key=f"rot_right_{selected_index}", use_container_width=True):
                     st.session_state[rot_key] = (st.session_state[rot_key] + 90) % 360
 
-            # Rotera bilden för förhandsvisning
             current_rot = st.session_state[rot_key]
             preview_img = pil_img.rotate(-current_rot, expand=True) if current_rot != 0 else pil_img
             
@@ -196,7 +194,6 @@ def show_card_dialog(selected_index, card_data):
                     app_data["collection"][selected_index]["Bild"] = img_b64
                     save_data_to_github(app_data)
                     
-                    # Rensa temporär rotation
                     del st.session_state[rot_key]
                     for key in list(st.session_state.keys()):
                         if "editor" in key:
@@ -205,7 +202,6 @@ def show_card_dialog(selected_index, card_data):
                     st.success("Bilden sparades!")
                     st.rerun()
     else:
-        # Nollställ rotation om filen tas bort
         st.session_state[rot_key] = 0
         raw_img = card_data.get("Bild", "")
         if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
