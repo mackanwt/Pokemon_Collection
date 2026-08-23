@@ -4,7 +4,7 @@ import json
 import base64
 import requests
 from datetime import date
-from PIL import Image
+from PIL import Image, ImageOps
 import io
 
 # --- 0. MOBILAPP- & PAGE-KONFIGURATION ---
@@ -108,13 +108,21 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
+# UPPDATERAD BILDHANTERING MED EXIF-ROTERING
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
+    
     img = Image.open(file_buffer)
-    img.thumbnail((300, 300))
+    
+    # Korrigera rotering baserat på mobilens EXIF-data
+    img = ImageOps.exif_transpose(img)
+    
+    # Skala om för bra skärpa utan att krascha minnet (600px höjd/bredd)
+    img.thumbnail((600, 600))
+    
     buffered = io.BytesIO()
-    img.save(buffered, format="JPEG", quality=70)
+    img.save(buffered, format="JPEG", quality=85)
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return f"data:image/jpeg;base64,{img_str}"
 
@@ -131,21 +139,23 @@ if not app_data:
 
 current_rate = 11.5  # EUR till SEK växelkurs
 
-# --- DIALOGRUTA FÖR ATT SKANNA BILD DIREKT PÅ EN RAD ---
-@st.dialog("📷 Skanna / Välj bild för kort")
+# UPPDATERAD DIALOGRUTA MED STOR BILD
+@st.dialog("🎴 Kortdetaljer & Skanner")
 def show_card_dialog(selected_index, card_data):
-    st.write(f"**Valt kort:** {card_data.get('Namn', '')} ({card_data.get('SetBet.', '')} {card_data.get('Setnr.', '')})")
+    st.markdown(f"### {card_data.get('Namn', '')}")
+    st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
     
+    # Stor bildvisning när du klickar på kortet
     if card_data.get("Bild"):
-        st.image(card_data["Bild"], caption="Nuvarande bild", width=120)
+        st.image(card_data["Bild"], use_container_width=True)
+    else:
+        st.info("Ingen bild finns sparad för detta kort ännu.")
     
     st.divider()
     
-    # Metod A: Streamlits inbyggda kamera
-    cam_img = st.camera_input("1. Öppna webbkamera/direktkamera", key=f"cam_{selected_index}")
-    
-    # Metod B: Filväljare (Klicka -> Välj "Kamera" i mobilen)
-    file_img = st.file_uploader("2. Eller klicka här och välj 'Kamera'", type=["png", "jpg", "jpeg"], key=f"file_{selected_index}")
+    st.markdown("**📷 Byt / Skanna bild för detta kort:**")
+    cam_img = st.camera_input("Öppna kamera", key=f"cam_{selected_index}")
+    file_img = st.file_uploader("Eller välj 'Kamera' / Galleri", type=["png", "jpg", "jpeg"], key=f"file_{selected_index}")
     
     new_img_str = ""
     if cam_img:
@@ -154,10 +164,10 @@ def show_card_dialog(selected_index, card_data):
         new_img_str = process_uploaded_image(file_img)
         
     if new_img_str:
-        if st.button("💾 Spara bild på detta kort", type="primary", use_container_width=True):
+        if st.button("💾 Spara den nya bilden", type="primary", use_container_width=True):
             app_data["collection"][selected_index]["Bild"] = new_img_str
             save_data_to_github(app_data)
-            st.success("Bilden sparades i samlingen!")
+            st.success("Bilden sparades!")
             st.rerun()
 
 # --- HUVUDLAYOUT ---
@@ -204,11 +214,9 @@ with tab1:
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
 
-        # Din ursprungliga toggle-knapp överst
         edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
         if edit_mode:
-            # 1. Konfiguration för data_editor (skrivbar Bild-kolumn)
             editable_config = column_config.copy()
             editable_config["Bild"] = st.column_config.TextColumn("Bild (URL/Base64)", width="small")
             
@@ -223,7 +231,6 @@ with tab1:
             
             st.divider()
             
-            # 2. Skanna/Ta foto på valt kort i redigeringsläget
             col_scan_sel, col_scan_btn = st.columns([2, 1])
             with col_scan_sel:
                 card_list = [f"Rad {i+1}: {r.get('Namn', '')} ({r.get('Setnr.', '')})" for i, r in edited_df.iterrows()]
@@ -240,7 +247,6 @@ with tab1:
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            # Vanlig tabellvisning utan popup vid klick
             st.dataframe(
                 df_display,
                 column_order=columns_order,
