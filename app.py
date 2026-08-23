@@ -6,6 +6,7 @@ import requests
 from datetime import date
 from PIL import Image, ImageOps
 import io
+import streamlit.components.v1 as components
 
 # --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -55,6 +56,86 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
+# --- SKRÄDDARSYDD KAMERA & BILD-KOMPRIMERARE FÖR MOBIL ---
+def custom_mobile_camera(key_id):
+    """
+    1. Öppnar mobilens NATIVE kamera (ger full autofokus för närbilder).
+    2. Komprimerar bilden direkt i webbläsaren innan sändning till Python (förhindrar krascher).
+    """
+    html_code = f"""
+    <div style="font-family: system-ui, -apple-system, sans-serif; text-align: center;">
+        <label for="input_{key_id}" style="
+            background-color: #0068c9;
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-block;
+            font-weight: 600;
+            font-size: 15px;
+            width: 100%;
+            box-sizing: border-box;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        ">
+            📷 Ta närbild med kameran / Välj bild
+        </label>
+        <input type="file" id="input_{key_id}" accept="image/*" capture="environment" style="display:none;" onchange="handleFile(event)">
+        <div id="msg_{key_id}" style="margin-top: 6px; font-size: 13px; color: #28a745; font-weight: bold;"></div>
+    </div>
+
+    <script>
+    function handleFile(event) {{
+        const file = event.target.files[0];
+        if (!file) return;
+
+        document.getElementById('msg_{key_id}').innerText = "Behandlar bild...";
+
+        const reader = new FileReader();
+        reader.onload = function(e) {{
+            const img = new Image();
+            img.onload = function() {{
+                // Skala ner bilden till max 800px bredd/höjd direkt i mobilen
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const max_size = 800;
+
+                if (width > height) {{
+                    if (width > max_size) {{
+                        height *= max_size / width;
+                        width = max_size;
+                    }}
+                }} else {{
+                    if (height > max_size) {{
+                        width *= max_size / height;
+                        height = max_size;
+                    }}
+                }}
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Komprimera till lätt JPEG (0.7 kvalitet)
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                
+                document.getElementById('msg_{key_id}').innerText = "✓ Bild klar! Tryck på Spara nedan.";
+
+                // Skicka den lätta bilden till Streamlit
+                window.parent.postMessage({{
+                    type: 'streamlit:setComponentValue',
+                    value: compressedDataUrl
+                }}, '*');
+            }};
+            img.src = e.target.result;
+        }};
+        reader.readAsDataURL(file);
+    }}
+    </script>
+    """
+    return components.html(html_code, height=90)
+
 # --- GITHUB INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
@@ -95,34 +176,6 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# AUTOMATISK KOMPRIMERING OCH SKALNING AV HÖGUPPLÖSTA BILDER
-def process_uploaded_image(file_buffer):
-    if file_buffer is None:
-        return ""
-    
-    try:
-        # Läs in filen (oavsett storlek)
-        bytes_data = file_buffer.getvalue()
-        img = Image.open(io.BytesIO(bytes_data))
-        
-        # Rätta till bildrotation från mobilen
-        img = ImageOps.exif_transpose(img)
-        
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-            
-        # Skala ner högupplösta mobilbilder till max 600x800 px för snabb laddning
-        img.thumbnail((600, 800), Image.Resampling.LANCZOS)
-        
-        # Komprimera kraftigt (JPEG 70% kvalitet)
-        buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=70, optimize=True)
-        img_str = base64.b64encode(buffered.getvalue()).decode()
-        return f"data:image/jpeg;base64,{img_str}"
-    except Exception as e:
-        st.error(f"Kunde inte behandla bilden: {e}")
-        return ""
-
 # Ladda data
 app_data = load_data_from_github()
 if not app_data:
@@ -160,17 +213,15 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    # Använd Streamlits officiella kamerasökare
-    cam_file = st.camera_input("📷 Ta ett foto på kortet", key=f"dialog_cam_{selected_index}")
+    # Använd den säkra kamerakomponenten
+    img_data_from_cam = custom_mobile_camera(f"dialog_{selected_index}")
     
-    if cam_file:
-        new_img_str = process_uploaded_image(cam_file)
-        if new_img_str:
-            if st.button("💾 Spara bild", type="primary", use_container_width=True):
-                app_data["collection"][selected_index]["Bild"] = new_img_str
-                save_data_to_github(app_data)
-                st.success("Bilden sparades!")
-                st.rerun()
+    if img_data_from_cam:
+        if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
+            app_data["collection"][selected_index]["Bild"] = img_data_from_cam
+            save_data_to_github(app_data)
+            st.success("Bilden sparades!")
+            st.rerun()
 
 # --- HUVUDLAYOUT ---
 tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort"])
@@ -331,8 +382,7 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    cam_file = st.camera_input("📷 Ta ett foto på kortet", key="add_new_cam")
-    final_img_str = process_uploaded_image(cam_file) if cam_file else ""
+    new_card_img = custom_mobile_camera("add_new_card")
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
@@ -357,7 +407,7 @@ with tab3:
         
         if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
             new_card = {
-                "Bild": final_img_str,
+                "Bild": new_card_img if new_card_img else "",
                 "Pärmnummer": parm,
                 "Språk": sprak,
                 "Namn": namn,
