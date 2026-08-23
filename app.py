@@ -110,7 +110,7 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# SÄKER BILDHANTERING MED MINNESOPTIMERING
+# BILDHANTERING MED OPTIMERING
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
@@ -146,7 +146,7 @@ if not app_data:
 current_rate = 11.5
 
 # DIALOGRUTA FÖR BILDER OCH SKANNING
-@st.dialog("🎴 Kortdetaljer & Skanner")
+@st.dialog("🎴 Kortdetaljer & Lägg till bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
     st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
@@ -161,40 +161,32 @@ def show_card_dialog(selected_index, card_data):
             elif isinstance(raw_img, str) and (raw_img.startswith("http://") or raw_img.startswith("https://")):
                 st.image(raw_img)
             else:
-                st.info("Ingen giltig bild finns sparad för detta kort ännu.")
+                st.info("Ingen bild finns sparad för detta kort ännu.")
         except Exception:
-            st.info("Ingen giltig bild finns sparad för detta kort ännu.")
+            st.info("Ingen bild finns sparad för detta kort ännu.")
     else:
         st.info("Ingen bild finns sparad för detta kort ännu.")
     
     st.divider()
     
-    st.markdown("**📷 Välj hur du vill lägga till bilden:**")
+    # type="image" tvingar mobilen att visa valet "Ta kort / Galleri"
+    up_file = st.file_uploader(
+        "Välj eller ta en bild", 
+        type="image", 
+        key=f"dialog_file_{selected_index}"
+    )
     
-    camera_tab, upload_tab = st.tabs(["📷 Webbkamera / Inbyggd", "📁 Fil / Mobilkamera"])
-    
-    new_img_str = ""
-    
-    with camera_tab:
-        cam_file = st.camera_input("Ta foto direkt", key=f"dialog_cam_{selected_index}")
-        if cam_file:
-            new_img_str = process_uploaded_image(cam_file)
-            
-    with upload_tab:
-        st.caption("Om din mobil stänger appen vid inbyggd kamera, använd knappen nedan:")
-        up_file = st.file_uploader("Välj bildfil eller ta foto med kamera-appen", type=["jpg", "jpeg", "png", "heic"], key=f"dialog_file_{selected_index}")
-        if up_file:
-            new_img_str = process_uploaded_image(up_file)
-            
-    if new_img_str:
-        if st.button("💾 Spara den nya bilden", type="primary", use_container_width=True):
-            app_data["collection"][selected_index]["Bild"] = new_img_str
-            save_data_to_github(app_data)
-            st.success("Bilden sparades!")
-            st.rerun()
+    if up_file:
+        new_img_str = process_uploaded_image(up_file)
+        if new_img_str:
+            if st.button("💾 Spara bild", type="primary", use_container_width=True):
+                app_data["collection"][selected_index]["Bild"] = new_img_str
+                save_data_to_github(app_data)
+                st.success("Bilden sparades!")
+                st.rerun()
 
 # --- HUVUDLAYOUT ---
-tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till / Skanna"])
+tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort"])
 
 # --- FLIK 1: HUVUDSAMLING ---
 with tab1:
@@ -258,7 +250,7 @@ with tab1:
             
             with col_scan_sel:
                 selected_row_num = st.number_input(
-                    "📷 Välj radnummer att fotografera:", 
+                    "🖼️ Välj radnummer för bild:", 
                     min_value=1, 
                     max_value=max(1, max_rows), 
                     value=1, 
@@ -273,7 +265,7 @@ with tab1:
             with col_scan_btn:
                 st.write("")
                 st.write("")
-                if st.button("📷 Öppna kamera för valt kort", use_container_width=True):
+                if st.button("🖼️ Hantera bild för valt kort", use_container_width=True):
                     if max_rows > 0:
                         show_card_dialog(selected_row_idx, edited_df.iloc[selected_row_idx])
             
@@ -352,19 +344,9 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    st.write("**Välj bildkälla:**")
-    tab_cam, tab_file = st.tabs(["📷 Webbkamera", "📁 Fil / Mobilkamera"])
-    
-    final_img_str = ""
-    with tab_cam:
-        c_img = st.camera_input("Ta foto på kortet")
-        if c_img:
-            final_img_str = process_uploaded_image(c_img)
-            
-    with tab_file:
-        f_img = st.file_uploader("Ladda upp bildfil", type=["jpg", "jpeg", "png", "heic"])
-        if f_img:
-            final_img_str = process_uploaded_image(f_img)
+    # type="image" ger mobilen valet mellan Kamera och Galleri
+    f_img = st.file_uploader("Välj eller ta bild på kortet", type="image", key="add_new_uploader")
+    final_img_str = process_uploaded_image(f_img) if f_img else ""
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
