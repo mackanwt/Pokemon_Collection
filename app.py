@@ -4,7 +4,7 @@ import json
 import base64
 import requests
 from datetime import date
-from PIL import Image, ImageOps
+from PIL import Image
 import io
 import streamlit.components.v1 as components
 
@@ -210,7 +210,7 @@ def show_card_dialog(selected_index, card_data):
             else:
                 st.image(raw_img)
         except Exception:
-            st.info("Ingen giltig bild finns sparad för detta kort ännu.")
+            st.info("Ingen bild finns sparad för detta kort ännu.")
     else:
         st.info("Ingen bild finns sparad för detta kort ännu.")
     
@@ -220,8 +220,14 @@ def show_card_dialog(selected_index, card_data):
     
     if img_data_from_cam:
         if st.button("💾 Spara bild på kortet", type="primary", use_container_width=True):
-            app_data["collection"][selected_index]["Bild"] = str(img_data_from_cam)
+            img_str = str(img_data_from_cam)
+            app_data["collection"][selected_index]["Bild"] = img_str
             save_data_to_github(app_data)
+            
+            # Rensa cachen i redigeraren för att tvinga fram den nya bilden
+            if "main_collection_editor" in st.session_state:
+                del st.session_state["main_collection_editor"]
+                
             st.success("Bilden sparades!")
             st.rerun()
 
@@ -238,10 +244,13 @@ with tab1:
         if "Bild" not in collection_df.columns:
             collection_df.insert(0, "Bild", "")
 
-        # Tvätta trasiga bildvärden i DataFrame
+        # Tvätta bort ogiltiga DeltaGenerator-strängar men behåll data:image
         def sanitize_img(val):
-            if isinstance(val, str) and (val.startswith("data:image") or val.startswith("http")):
-                return val
+            if val is None:
+                return ""
+            s_val = str(val).strip()
+            if s_val.startswith("data:image") or s_val.startswith("http"):
+                return s_val
             return ""
 
         collection_df["Bild"] = collection_df["Bild"].apply(sanitize_img)
