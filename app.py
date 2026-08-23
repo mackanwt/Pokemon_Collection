@@ -6,6 +6,7 @@ import requests
 from datetime import date
 from PIL import Image, ImageOps
 import io
+import streamlit.components.v1 as components
 
 # --- 0. MOBILAPP- & PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -68,23 +69,49 @@ st.markdown(f"""
             pointer-events: auto !important;
         }}
     </style>
-
-    <!-- TVINGA NATIVE KAMERA I MOBILER -->
-    <script>
-        const forceCameraAccess = () => {{
-            const inputs = document.querySelectorAll('input[type="file"]');
-            inputs.forEach(input => {{
-                input.setAttribute('accept', 'image/*');
-                input.setAttribute('capture', 'environment');
-            }});
-        }};
-        
-        // Kör vid laddning och vid DOM-ändringar (när st.dialog öppnas)
-        const observer = new MutationObserver(forceCameraAccess);
-        observer.observe(document.body, {{ childList: true, subtree: true }});
-        window.addEventListener('load', forceCameraAccess);
-    </script>
 """, unsafe_allow_html=True)
+
+# --- NATIVE MOBILKAMERA-KOMPONENT ---
+def mobile_camera_input(key):
+    """En garanterad mobil-kameraknapp som alltid anropar mobilens kamera"""
+    html_code = f"""
+    <div style="font-family: sans-serif; text-align: center;">
+        <label for="cam_input_{key}" style="
+            background-color: #ff4b4b;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-block;
+            font-weight: bold;
+            width: 90%;
+            box-sizing: border-box;
+        ">
+            📷 Öppna Kameran / Välj Bild
+        </label>
+        <input type="file" id="cam_input_{key}" accept="image/*" capture="environment" style="display:none;" onchange="loadFile(event)">
+        <p id="status_{key}" style="margin-top: 8px; font-size: 12px; color: #666;"></p>
+    </div>
+
+    <script>
+    function loadFile(event) {{
+        const file = event.target.files[0];
+        if (file) {{
+            document.getElementById('status_{key}').innerText = "Bild vald! Spara ändringar nedan.";
+            const reader = new FileReader();
+            reader.onload = function(e) {{
+                const imgData = e.target.result;
+                window.parent.postMessage({{
+                    type: 'streamlit:setComponentValue',
+                    value: imgData
+                }}, '*');
+            }};
+            reader.readAsDataURL(file);
+        }}
+    }}
+    </script>
+    """
+    return components.html(html_code, height=90)
 
 # --- GITHUB INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
@@ -127,13 +154,18 @@ def save_data_to_github(data_dict):
     return put_res.status_code in [200, 201]
 
 # SÄKER BILDHANTERING MED AUTOMATISK KOMPRIMERING
-def process_uploaded_image(file_buffer):
-    if file_buffer is None:
+def process_uploaded_image(raw_str):
+    if not raw_str:
         return ""
     
     try:
-        bytes_data = file_buffer.getvalue()
-        img = Image.open(io.BytesIO(bytes_data))
+        if "," in raw_str:
+            base64_data = raw_str.split(",")[1]
+        else:
+            base64_data = raw_str
+            
+        img_bytes = base64.b64decode(base64_data)
+        img = Image.open(io.BytesIO(img_bytes))
         
         img = ImageOps.exif_transpose(img)
         
@@ -187,14 +219,11 @@ def show_card_dialog(selected_index, card_data):
     
     st.divider()
     
-    up_file = st.file_uploader(
-        "📷 Ta ett foto med kameran", 
-        type=["png", "jpg", "jpeg", "heic", "webp"], 
-        key=f"dialog_file_{selected_index}"
-    )
+    # Kör den egna mobilkameran
+    cam_data = mobile_camera_input(key=f"dialog_cam_{selected_index}")
     
-    if up_file:
-        new_img_str = process_uploaded_image(up_file)
+    if cam_data:
+        new_img_str = process_uploaded_image(cam_data)
         if new_img_str:
             if st.button("💾 Spara bild", type="primary", use_container_width=True):
                 app_data["collection"][selected_index]["Bild"] = new_img_str
@@ -361,12 +390,8 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
-    f_img = st.file_uploader(
-        "📷 Ta ett foto på kortet", 
-        type=["png", "jpg", "jpeg", "heic", "webp"], 
-        key="add_new_uploader"
-    )
-    final_img_str = process_uploaded_image(f_img) if f_img else ""
+    new_cam_data = mobile_camera_input(key="add_new_cam")
+    final_img_str = process_uploaded_image(new_cam_data) if new_cam_data else ""
 
     with st.form("add_new_card_form"):
         col_a, col_b, col_c = st.columns(3)
