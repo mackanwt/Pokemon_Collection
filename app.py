@@ -57,12 +57,6 @@ st.markdown(f"""
             touch-action: manipulation;
         }}
         
-        /* Hindrar mobilens tangentbord från att öppnas vid tryck på Selectbox */
-        div[data-baseweb="select"] input {{
-            aria-autocomplete: none !important;
-            inputmode: none !important;
-        }}
-        
         /* Lås kolumnrubriker så de inte flyttas av misstag på mobilen */
         [data-testid="stHeader"] button,
         div[role="columnheader"] {{
@@ -87,10 +81,13 @@ def load_data_from_github():
         return None
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    res = requests.get(url, headers=headers)
-    if res.status_code == 200:
-        content = base64.b64decode(res.json()["content"]).decode('utf-8')
-        return json.loads(content)
+    try:
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            content = base64.b64decode(res.json()["content"]).decode('utf-8')
+            return json.loads(content)
+    except Exception:
+        pass
     return None
 
 def save_data_to_github(data_dict):
@@ -114,30 +111,33 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# BILDHANTERING MED EXIF-ROTERING OCH UTAN BESKÄRNING
+# SÄKER OCH AGGRESSIV BILDHANTERING FOR ATT UNDVIKA OOM-KRASCHER
 def process_uploaded_image(file_buffer):
     if file_buffer is None:
         return ""
     
-    img = Image.open(file_buffer)
-    img = ImageOps.exif_transpose(img)
-    
-    img.thumbnail((450, 600))
-    
-    buffered = io.BytesIO()
-    img.save(buffered, format="JPEG", quality=85)
-    img_str = base64.b64encode(buffered.getvalue()).decode()
-    return f"data:image/jpeg;base64,{img_str}"
-
-# Hjälpfunktion för att konvertera Base64 till PIL-bild snyggt för st.image
-def load_base64_image(base64_str):
     try:
-        if "," in base64_str:
-            base64_str = base64_str.split(",")[1]
-        img_bytes = base64.b64decode(base64_str)
-        return Image.open(io.BytesIO(img_bytes))
-    except Exception:
-        return None
+        # Öppna bilden säkert
+        img = Image.open(file_buffer)
+        
+        # Orientera bilden rätt baserat på EXIF
+        img = ImageOps.exif_transpose(img)
+        
+        # Konvertera till RGB om den är i RGBA/annan färgrymd
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+            
+        # Skala ner kraftigt för att spara minne (max 400x550px)
+        img.thumbnail((400, 550), Image.Resampling.LANCZOS)
+        
+        # Spara till komprimerad JPG
+        buffered = io.BytesIO()
+        img.save(buffered, format="JPEG", quality=70, optimize=True)
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        return f"data:image/jpeg;base64,{img_str}"
+    except Exception as e:
+        st.error(f"Kunde inte behandla bilden: {e}")
+        return ""
 
 # Ladda data från GitHub eller sätt standard
 app_data = load_data_from_github()
@@ -152,7 +152,7 @@ if not app_data:
 
 current_rate = 11.5  # EUR till SEK växelkurs
 
-# DIALOGRUTA MED BILD (Fixad Base64-avkodning)
+# DIALOGRUTA MED BILD (Säker visning och alltid synlig sparaknapp)
 @st.dialog("🎴 Kortdetaljer & Skanner")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -160,11 +160,17 @@ def show_card_dialog(selected_index, card_data):
     
     raw_img = card_data.get("Bild", "")
     if raw_img:
-        pil_img = load_base64_image(raw_img)
-        if pil_img:
-            st.image(pil_img)
-        else:
-            st.warning("Kunde inte läsa in bildformatet.")
+        try:
+            if isinstance(raw_img, str) and raw_img.startswith("data:image"):
+                base64_data = raw_img.split(",")[1]
+                img_bytes = base64.b64decode(base64_data)
+                st.image(Image.open(io.BytesIO(img_bytes)))
+            elif isinstance(raw_img, str) and (raw_img.startswith("http://") or raw_img.startswith("https://")):
+                st.image(raw_img)
+            else:
+                st.info("Ingen bild finns sparad för detta kort ännu.")
+        except Exception:
+            st.info("Ingen bild finns sparad för detta kort ännu.")
     else:
         st.info("Ingen bild finns sparad för detta kort ännu.")
     
@@ -180,12 +186,14 @@ def show_card_dialog(selected_index, card_data):
     elif file_img:
         new_img_str = process_uploaded_image(file_img)
         
-    if new_img_str:
-        if st.button("💾 Spara den nya bilden", type="primary", use_container_width=True):
+    if st.button("💾 Spara bilden", type="primary", use_container_width=True):
+        if new_img_str:
             app_data["collection"][selected_index]["Bild"] = new_img_str
             save_data_to_github(app_data)
             st.success("Bilden sparades!")
             st.rerun()
+        else:
+            st.warning("Du måste ta ett foto eller välja en bildfil först!")
 
 # --- HUVUDLAYOUT ---
 tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till / Skanna"])
@@ -247,16 +255,32 @@ with tab1:
             
             st.divider()
             
-            col_scan_sel, col_scan_btn = st.columns([2, 1])
-            with col_scan_sel:
-                card_list = [f"Rad {i+1}: {r.get('Namn', '')} ({r.get('Setnr.', '')})" for i, r in edited_df.iterrows()]
-                selected_card_to_scan = st.selectbox("📷 Välj kort att fotografera/skanna:", card_list)
-                selected_row_idx = card_list.index(selected_card_to_scan) if card_list else 0
-                
-            with col_scan_btn:
-                if st.button("📷 Öppna kamera för valt kort", use_container_width=True):
-                    show_card_dialog(selected_row_idx, edited_df.iloc[selected_row_idx])
+            # --- FÖRBÄTTRAD VALJARE FÖR ATT SLIPPA TANGENTBORD ---
+            max_rows = len(edited_df)
+            col_scan_sel, col_scan_btn = st.columns([1, 1])
             
+            with col_scan_sel:
+                selected_row_num = st.number_input(
+                    "📷 Välj radnummer att skanna/fotografera:", 
+                    min_value=1, 
+                    max_value=max(1, max_rows), 
+                    value=1, 
+                    step=1
+                )
+                selected_row_idx = selected_row_num - 1
+                if max_rows > 0:
+                    current_card_name = edited_df.iloc[selected_row_idx].get('Namn', '')
+                    current_card_set = edited_df.iloc[selected_row_idx].get('Setnr.', '')
+                    st.caption(f"Valt kort: **Rad {selected_row_num} - {current_card_name} ({current_card_set})**")
+
+            with col_scan_btn:
+                st.write("") # Marginaljustering
+                st.write("")
+                if st.button("📷 Öppna kamera för valt kort", use_container_width=True):
+                    if max_rows > 0:
+                        show_card_dialog(selected_row_idx, edited_df.iloc[selected_row_idx])
+            
+            st.divider()
             if st.button("💾 Spara alla ändringar i samlingen", type="primary", use_container_width=True):
                 app_data["collection"] = edited_df.to_dict(orient="records")
                 save_data_to_github(app_data)
