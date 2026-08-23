@@ -15,23 +15,58 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# PWA Meta-tags för mobilapp-känsla
-st.markdown("""
+# Ikon-URL för din Android-app (PNG-bild)
+APP_ICON_URL = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3b4.png"
+
+# Manifest-konfiguration för Android Chrome
+manifest_data = {
+    "name": "Pokémon Samling",
+    "short_name": "Pokémon",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#ffffff",
+    "icons": [
+        {
+            "src": APP_ICON_URL,
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": APP_ICON_URL,
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
+
+# Omvandla manifest till Data-URI för Android
+manifest_json = json.dumps(manifest_data)
+manifest_base64 = base64.b64encode(manifest_json.encode('utf-8')).decode('utf-8')
+manifest_href = f"data:application/manifest+json;base64,{manifest_base64}"
+
+st.markdown(f"""
+    <!-- Web App Manifest för Android -->
+    <link rel="manifest" href="{manifest_href}">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#ffffff">
+
+    <!-- Ikoner fallback -->
+    <link rel="icon" type="image/png" sizes="192x192" href="{APP_ICON_URL}">
+    <link rel="shortcut icon" href="{APP_ICON_URL}">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="PokémonApp">
     
     <style>
-        .main .block-container {
+        .main .block-container {{
             padding-top: 1rem;
             padding-bottom: 2rem;
             padding-left: 0.8rem;
             padding-right: 0.8rem;
-        }
-        button, input, select {
+        }}
+        button, input, select {{
             touch-action: manipulation;
-        }
+        }}
     </style>
 """, unsafe_allow_html=True)
 
