@@ -225,7 +225,11 @@ tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Läg
 # --- FLIK 1: HUVUDSAMLING ---
 with tab1:
     st.subheader("Min Samling")
+    edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
     
+    # PLACEHOLDER FÖR BILDEN - LIGGER DIREKT UNDER REDIGERINGSLÄGESKNAPPEN
+    image_preview_container = st.container()
+
     collection_df = pd.DataFrame(app_data.get("collection", []))
     
     if not collection_df.empty:
@@ -271,8 +275,6 @@ with tab1:
             "Datum tillagd": st.column_config.TextColumn("Datum", width="small"),
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
-
-        edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
         if edit_mode:
             edited_df = st.data_editor(
@@ -319,7 +321,7 @@ with tab1:
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            st.caption("👆 *Tryck på en rad i tabellen för att visa kortbilden direkt nedanför.*")
+            st.caption("👆 *Tryck på en rad i tabellen för att visa kortbilden direkt nedanför redigeringsknappen.*")
             # DIREKTKLICK PÅ RAD
             event = st.dataframe(
                 df_display,
@@ -331,28 +333,29 @@ with tab1:
                 selection_mode="single-row"
             )
 
-            # DIREKTVISNING AV BILD VID KLICK
+            # RITA BILDEN HÖGST UPP (I CONTAINER) VID KLICK
             selected_rows = event.selection.get("rows", [])
             if selected_rows:
                 selected_idx = selected_rows[0]
                 card_item = app_data["collection"][selected_idx]
                 raw_img = card_item.get("Bild", "")
                 
-                st.divider()
-                st.markdown(f"### 🔍 {card_item.get('Namn')} ({card_item.get('Set')})")
-                
-                if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
-                    try:
-                        if raw_img.startswith("data:image"):
-                            base64_data = raw_img.split(",")[1]
-                            img_bytes = base64.b64decode(base64_data)
-                            st.image(Image.open(io.BytesIO(img_bytes)), use_container_width=True)
-                        else:
-                            st.image(raw_img, use_container_width=True)
-                    except Exception:
-                        st.error("Kunde inte ladda bilden.")
-                else:
-                    st.info("Detta kort har ingen bild sparad ännu.")
+                with image_preview_container:
+                    st.markdown(f"### 🔍 {card_item.get('Namn')} ({card_item.get('Set')})")
+                    
+                    if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
+                        try:
+                            if raw_img.startswith("data:image"):
+                                base64_data = raw_img.split(",")[1]
+                                img_bytes = base64.b64decode(base64_data)
+                                st.image(Image.open(io.BytesIO(img_bytes)), use_container_width=True)
+                            else:
+                                st.image(raw_img, use_container_width=True)
+                        except Exception:
+                            st.error("Kunde inte ladda bilden.")
+                    else:
+                        st.info("Detta kort har ingen bild sparad ännu.")
+                    st.divider()
 
         total_value_sek = df_display["Värde idag (SEK)"].sum()
         total_cost_sek = df_display["Köpt för (SEK)"].sum()
