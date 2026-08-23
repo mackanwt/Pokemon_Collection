@@ -58,10 +58,6 @@ st.markdown(f"""
 
 # --- SKRÄDDARSYDD KAMERA & BILD-KOMPRIMERARE FÖR MOBIL ---
 def custom_mobile_camera(key_id):
-    """
-    1. Öppnar mobilens NATIVE kamera (ger full autofokus för närbilder).
-    2. Komprimerar bilden direkt i webbläsaren innan sändning till Python (förhindrar krascher).
-    """
     html_code = f"""
     <div style="font-family: system-ui, -apple-system, sans-serif; text-align: center;">
         <label for="input_{key_id}" style="
@@ -160,12 +156,14 @@ def save_data_to_github(data_dict):
     res = requests.get(url, headers=headers)
     sha = res.json()["sha"] if res.status_code == 200 else None
     
-    # Säkerställ ren text-JSON för bildfältet
     clean_collection = []
     for item in data_dict.get("collection", []):
         clean_item = dict(item)
         if "Bild" in clean_item:
-            clean_item["Bild"] = str(clean_item["Bild"]) if clean_item["Bild"] is not None else ""
+            val = str(clean_item["Bild"]) if clean_item["Bild"] is not None else ""
+            if not (val.startswith("data:image") or val.startswith("http")):
+                val = ""
+            clean_item["Bild"] = val
         clean_collection.append(clean_item)
     
     data_dict["collection"] = clean_collection
@@ -203,24 +201,21 @@ def show_card_dialog(selected_index, card_data):
     st.caption(f"Set: {card_data.get('Set', '')} ({card_data.get('Setnr.', '')}) | Skick: {card_data.get('Skick', '')}")
     
     raw_img = card_data.get("Bild", "")
-    if raw_img:
+    if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
         try:
-            if isinstance(raw_img, str) and raw_img.startswith("data:image"):
+            if raw_img.startswith("data:image"):
                 base64_data = raw_img.split(",")[1]
                 img_bytes = base64.b64decode(base64_data)
                 st.image(Image.open(io.BytesIO(img_bytes)))
-            elif isinstance(raw_img, str) and (raw_img.startswith("http://") or raw_img.startswith("https://")):
-                st.image(raw_img)
             else:
-                st.info("Ingen bild finns sparad för detta kort ännu.")
+                st.image(raw_img)
         except Exception:
-            st.info("Ingen bild finns sparad för detta kort ännu.")
+            st.info("Ingen giltig bild finns sparad för detta kort ännu.")
     else:
         st.info("Ingen bild finns sparad för detta kort ännu.")
     
     st.divider()
     
-    # Använd kamerakomponenten
     img_data_from_cam = custom_mobile_camera(f"dialog_{selected_index}")
     
     if img_data_from_cam:
@@ -242,6 +237,14 @@ with tab1:
     if not collection_df.empty:
         if "Bild" not in collection_df.columns:
             collection_df.insert(0, "Bild", "")
+
+        # Tvätta trasiga bildvärden i DataFrame
+        def sanitize_img(val):
+            if isinstance(val, str) and (val.startswith("data:image") or val.startswith("http")):
+                return val
+            return ""
+
+        collection_df["Bild"] = collection_df["Bild"].apply(sanitize_img)
 
         df_display = collection_df.copy()
         
@@ -276,13 +279,10 @@ with tab1:
         edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
         
         if edit_mode:
-            editable_config = column_config.copy()
-            editable_config["Bild"] = st.column_config.TextColumn("Bild (URL/Base64)", width="small")
-            
             edited_df = st.data_editor(
                 df_display,
                 column_order=columns_order,
-                column_config=editable_config,
+                column_config=column_config,
                 num_rows="dynamic",
                 use_container_width=True,
                 key="main_collection_editor"
@@ -357,7 +357,7 @@ with tab2:
         ]
         
         editable_config = {
-            "Bild": st.column_config.TextColumn("Bild (URL/Base64)", width="small"),
+            "Bild": st.column_config.ImageColumn("Bild", width="small"),
             "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
             "Språk": st.column_config.TextColumn("Språk", width="small"),
             "Namn": st.column_config.TextColumn("Namn", width="medium"),
