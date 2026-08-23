@@ -137,8 +137,7 @@ if not app_data:
 
 current_rate = 11.5  # EUR till SEK växelkurs
 
-# DIALOGRUTA MED STOR BILD
-# UPPDATERAD DIALOGRUTA SOM GÖR ATT TILLGÅNG TILL KAMERAN ÅTERSTÄLLS I UPLOAD
+# DIALOGRUTA MED STOR BILD (Återställd file_uploader utan strikt type)
 @st.dialog("🎴 Kortdetaljer & Skanner")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -152,16 +151,10 @@ def show_card_dialog(selected_index, card_data):
     st.divider()
     
     st.markdown("**📷 Byt / Skanna bild för detta kort:**")
+    cam_img = st.camera_input("Öppna kamera", key=f"cam_{selected_index}")
     
-    # 1. Direkta kameran
-    cam_img = st.camera_input("Öppna direktkamera", key=f"cam_{selected_index}")
-    
-    # 2. Filväljare – genom att inte begränsa typerna för strängt på mobilen tvingas Android visa 'Kamera'-valet igen
-    file_img = st.file_uploader(
-        "Klicka här för att välja Kamera eller Galleri", 
-        type=["png", "jpg", "jpeg", "webp"], 
-        key=f"file_{selected_index}"
-    )
+    # Inget 'type'-argument gör att Android återigen visar valet Kamera/Galleri/Filer
+    file_img = st.file_uploader("Välj bild eller ta ett nytt foto", key=f"file_{selected_index}")
     
     new_img_str = ""
     if cam_img:
@@ -202,7 +195,6 @@ with tab1:
             "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
         ]
         
-        # Bildkolumnen satt till medium för att undvika beskärning på mobil
         column_config = {
             "Bild": st.column_config.ImageColumn("Bild", width="medium"),
             "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
@@ -321,7 +313,7 @@ with tab2:
 with tab3:
     st.subheader("➕ Lägg till nytt kort")
     cam_image = st.camera_input("📷 Ta foto på det nya kortet")
-    file_image = st.file_uploader("Eller välj bild från mobilen", type=["png", "jpg", "jpeg"])
+    file_image = st.file_uploader("Välj bild eller ta ett nytt foto")
     
     final_img_str = ""
     if cam_image:
