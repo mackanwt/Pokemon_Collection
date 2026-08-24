@@ -62,7 +62,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- HJÄLPFUNKTION FÖR BILD-OMVANDLING OCH ROTATION ---
+# --- HJÄLPFUNKTION FÖR BILD-OMVANDLING OCH ROTATION (HÅRD KOMPRIMERING) ---
 def process_pil_image(img, rotate_degrees=0):
     try:
         try:
@@ -74,10 +74,11 @@ def process_pil_image(img, rotate_degrees=0):
             img = img.rotate(-rotate_degrees, expand=True)
 
         img = img.convert("RGB")
-        img.thumbnail((800, 800))
+        # Minskat till 400px och 55% kvalitet för att hålla data.json extremt liten
+        img.thumbnail((400, 400))
         
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=80)
+        img.save(buffered, format="JPEG", quality=55, optimize=True)
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
         return f"data:image/jpeg;base64,{img_str}"
     except Exception as e:
@@ -97,7 +98,7 @@ def get_pil_from_uploaded_file(file_buffer):
     except Exception:
         return None
 
-# --- GITHUB INTEGRATION ---
+# --- GITHUB INTEGRATION (SÄKER INLÄSNING VIA RAW RAW-URL) ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
 FILE_PATH = "data.json"
@@ -105,8 +106,20 @@ FILE_PATH = "data.json"
 def load_data_from_github():
     if not GITHUB_TOKEN or not GITHUB_REPO:
         return None
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
+    
+    # Hämta direkt från Raw URL för att kringgå 1MB-gränsen på REST API
+    raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    
+    try:
+        res = requests.get(raw_url, headers=headers)
+        if res.status_code == 200:
+            return json.loads(res.text)
+    except Exception:
+        pass
+
+    # Fallback till REST API om Raw misslyckas
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     try:
         res = requests.get(url, headers=headers)
         if res.status_code == 200:
@@ -114,6 +127,7 @@ def load_data_from_github():
             return json.loads(content)
     except Exception:
         pass
+
     return None
 
 def save_data_to_github(data_dict):
@@ -162,7 +176,7 @@ if not app_data:
 
 current_rate = 11.5
 
-# DIALOGRUTA FÖR BILDER MED ROTERING (Vid redigering)
+# DIALOGRUTA FÖR BILDER MED ROTERING
 @st.dialog("🎴 Kortdetaljer & Välj bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -227,7 +241,6 @@ with tab1:
     st.subheader("Min Samling")
     edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
     
-    # PLACEHOLDER FÖR BILDEN - LIGGER DIREKT UNDER REDIGERINGSLÄGESKNAPPEN
     image_preview_container = st.container()
 
     collection_df = pd.DataFrame(app_data.get("collection", []))
@@ -321,7 +334,6 @@ with tab1:
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            # DIREKTKLICK PÅ RAD
             event = st.dataframe(
                 df_display,
                 column_order=columns_order,
@@ -332,7 +344,6 @@ with tab1:
                 selection_mode="single-row"
             )
 
-            # RITA BILDEN HÖGST UPP (I CONTAINER) VID KLICK
             selected_rows = event.selection.get("rows", [])
             if selected_rows:
                 selected_idx = selected_rows[0]
