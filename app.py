@@ -213,8 +213,10 @@ def show_card_dialog(selected_index, card_data):
                         del st.session_state[rot_key]
                     if "open_dialog_index" in st.session_state:
                         del st.session_state["open_dialog_index"]
+                    
+                    # Rensa Streamlit-tillstånd för editerarna så att nya bilden läses in
                     for key in list(st.session_state.keys()):
-                        if "editor" in key:
+                        if "editor" in key or "main_collection_editor" in key:
                             del st.session_state[key]
 
                     st.success("Bilden sparades!")
@@ -334,9 +336,16 @@ with tab1:
                 edited_records = edited_df.to_dict(orient="records")
                 for idx, record in enumerate(edited_records):
                     if idx < len(app_data["collection"]):
-                        record["Bild"] = app_data["collection"][idx].get("Bild", "")
+                        # Om editeraren tömt bilden, behåll befintlig bild från app_data
+                        if not record.get("Bild"):
+                            record["Bild"] = app_data["collection"][idx].get("Bild", "")
                 app_data["collection"] = edited_records
                 save_data_to_github(app_data)
+                
+                for key in list(st.session_state.keys()):
+                    if "editor" in key or "main_collection_editor" in key:
+                        del st.session_state[key]
+                        
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
@@ -427,9 +436,15 @@ with tab2:
             edited_records = edited_df.to_dict(orient="records")
             for idx, record in enumerate(edited_records):
                 if idx < len(app_data["collection"]):
-                    record["Bild"] = app_data["collection"][idx].get("Bild", "")
+                    if not record.get("Bild"):
+                        record["Bild"] = app_data["collection"][idx].get("Bild", "")
             app_data["collection"] = edited_records
             save_data_to_github(app_data)
+            
+            for key in list(st.session_state.keys()):
+                if "editor" in key or "text_editor_grid" in key:
+                    del st.session_state[key]
+
             st.success("Samlingen sparades!")
             st.rerun()
 
