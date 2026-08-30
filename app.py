@@ -3,6 +3,7 @@ import pandas as pd
 import json
 import base64
 import requests
+import time
 from datetime import date
 from PIL import Image, ImageOps
 import io
@@ -88,7 +89,7 @@ def process_pil_image_to_bytes(img, rotate_degrees=0):
         return None
 
 def upload_image_to_github(img_bytes):
-    """Laddar upp bilden som fil till GitHub och returnerar en ren raw-URL."""
+    """Laddar upp bilden till GitHub och returnerar URL."""
     if not GITHUB_TOKEN or not GITHUB_REPO or not img_bytes:
         return ""
     
@@ -105,7 +106,9 @@ def upload_image_to_github(img_bytes):
     res = requests.put(url, json=payload, headers=headers)
     if res.status_code in [200, 201]:
         clean_repo = GITHUB_REPO.strip("/")
-        return f"https://raw.githubusercontent.com/{clean_repo}/main/{filename}"
+        # Tvinga cache-busting med tidsstämpel så att Streamlit laddar den direkt
+        timestamp = int(time.time())
+        return f"https://raw.githubusercontent.com/{clean_repo}/main/{filename}?v={timestamp}"
     else:
         st.error(f"Kunde inte ladda upp bilden till GitHub: {res.text}")
         return ""
@@ -235,7 +238,7 @@ def show_card_dialog(selected_index, card_data):
     else:
         st.session_state[rot_key] = 0
         raw_img = card_data.get("Bild", "")
-        if raw_img and isinstance(raw_img, str) and raw_img.startswith("http"):
+        if raw_img and isinstance(raw_img, str) and (raw_img.startswith("http") or raw_img.startswith("data:image")):
             st.image(raw_img, caption="Nuvarande sparad bild")
         else:
             st.info("Ingen bild finns sparad för detta kort ännu.")
@@ -257,13 +260,13 @@ with tab1:
             collection_df.insert(0, "Bild", "")
 
         def sanitize_img(val):
-            if val is None:
-                return None
+            if not val:
+                return ""
             s_val = str(val).strip()
-            # Säkerställer att länken accepteras korrekt av Streamlits ImageColumn
-            if s_val.startswith("http://") or s_val.startswith("https://"):
+            # Tillåt både webblänkar (HTTP/HTTPS) och tidigare sparade Base64-bilder
+            if s_val.startswith("http://") or s_val.startswith("https://") or s_val.startswith("data:image"):
                 return s_val
-            return None
+            return ""
 
         collection_df["Bild"] = collection_df["Bild"].apply(sanitize_img)
         df_display = collection_df.copy()
@@ -350,15 +353,12 @@ with tab1:
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            # I läsläget används st.dataframe vilket renderar ImageColumn extremt pålitligt
             st.dataframe(
                 df_display,
                 column_order=columns_order,
                 column_config=column_config,
                 use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row"
+                hide_index=True
             )
 
         total_value_sek = df_display["Värde idag (SEK)"].sum()
