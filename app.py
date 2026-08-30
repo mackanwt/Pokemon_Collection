@@ -327,8 +327,7 @@ with tab1:
                 edited_records = edited_df.to_dict(orient="records")
                 for idx, record in enumerate(edited_records):
                     if idx < len(app_data["collection"]):
-                        if not record.get("Bild"):
-                            record["Bild"] = app_data["collection"][idx].get("Bild", "")
+                        record["Bild"] = app_data["collection"][idx].get("Bild", "")
                 app_data["collection"] = edited_records
                 save_data_to_github(app_data)
                 st.success("Samlingen sparades!")
@@ -421,8 +420,7 @@ with tab2:
             edited_records = edited_df.to_dict(orient="records")
             for idx, record in enumerate(edited_records):
                 if idx < len(app_data["collection"]):
-                    if not record.get("Bild"):
-                        record["Bild"] = app_data["collection"][idx].get("Bild", "")
+                    record["Bild"] = app_data["collection"][idx].get("Bild", "")
             app_data["collection"] = edited_records
             save_data_to_github(app_data)
             st.success("Samlingen sparades!")
