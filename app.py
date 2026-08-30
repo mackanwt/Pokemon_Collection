@@ -74,7 +74,6 @@ def process_pil_image(img, rotate_degrees=0):
             img = img.rotate(-rotate_degrees, expand=True)
 
         img = img.convert("RGB")
-        # Minskat till 400px och 55% kvalitet för att hålla data.json extremt liten
         img.thumbnail((400, 400))
         
         buffered = io.BytesIO()
@@ -107,7 +106,6 @@ def load_data_from_github():
     if not GITHUB_TOKEN or not GITHUB_REPO:
         return None
     
-    # Hämta direkt från Raw URL för att kringgå 1MB-gränsen på REST API
     raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
@@ -118,7 +116,6 @@ def load_data_from_github():
     except Exception:
         pass
 
-    # Fallback till REST API om Raw misslyckas
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     try:
         res = requests.get(url, headers=headers)
@@ -188,29 +185,34 @@ def show_card_dialog(selected_index, card_data):
 
     uploaded_file = st.file_uploader("🖼️ Välj bild från galleriet/filerna", type=["jpg", "jpeg", "png"], key=f"dialog_upload_{selected_index}")
     
-    if uploaded_file:
+    if uploaded_file is not None:
         pil_img = get_pil_from_uploaded_file(uploaded_file)
         if pil_img:
             col_left, col_right = st.columns(2)
             with col_left:
                 if st.button("🔄 Rotera 90° Vänster", key=f"rot_left_{selected_index}", use_container_width=True):
                     st.session_state[rot_key] = (st.session_state[rot_key] - 90) % 360
+                    st.rerun()
             with col_right:
                 if st.button("🔄 Rotera 90° Höger", key=f"rot_right_{selected_index}", use_container_width=True):
                     st.session_state[rot_key] = (st.session_state[rot_key] + 90) % 360
+                    st.rerun()
 
             current_rot = st.session_state[rot_key]
             preview_img = pil_img.rotate(-current_rot, expand=True) if current_rot != 0 else pil_img
             
             st.image(preview_img, caption=f"Förhandsvisning (Rotation: {current_rot}°)")
             
-            if st.button("💾 Spara denna bild på kortet", type="primary", use_container_width=True):
+            if st.button("💾 Spara denna bild på kortet", type="primary", use_container_width=True, key=f"save_img_btn_{selected_index}"):
                 img_b64 = process_pil_image(pil_img, rotate_degrees=current_rot)
                 if img_b64:
                     app_data["collection"][selected_index]["Bild"] = img_b64
                     save_data_to_github(app_data)
                     
-                    del st.session_state[rot_key]
+                    if rot_key in st.session_state:
+                        del st.session_state[rot_key]
+                    if "open_dialog_index" in st.session_state:
+                        del st.session_state["open_dialog_index"]
                     for key in list(st.session_state.keys()):
                         if "editor" in key:
                             del st.session_state[key]
@@ -319,8 +321,13 @@ with tab1:
                 st.write("")
                 if st.button("🖼️ Hantera/Byt bild på valt kort", use_container_width=True):
                     if max_rows > 0:
-                        real_card_data = app_data["collection"][selected_row_idx]
-                        show_card_dialog(selected_row_idx, real_card_data)
+                        st.session_state["open_dialog_index"] = selected_row_idx
+
+            if "open_dialog_index" in st.session_state:
+                dlg_idx = st.session_state["open_dialog_index"]
+                if dlg_idx < len(app_data["collection"]):
+                    real_card_data = app_data["collection"][dlg_idx]
+                    show_card_dialog(dlg_idx, real_card_data)
             
             st.divider()
             if st.button("💾 Spara alla ändringar i samlingen", type="primary", use_container_width=True):
