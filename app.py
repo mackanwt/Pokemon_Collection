@@ -7,7 +7,6 @@ from datetime import date
 from PIL import Image, ImageOps
 import io
 import uuid
-import time
 
 # --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -36,7 +35,6 @@ manifest_json = json.dumps(manifest_data)
 manifest_base64 = base64.b64encode(manifest_json.encode('utf-8')).decode('utf-8')
 manifest_href = f"data:application/manifest+json;base64,{manifest_base64}"
 
-# CSS FIX FÖR MOBIL
 st.markdown(f"""
     <link rel="manifest" href="{manifest_href}">
     <meta name="mobile-web-app-capable" content="yes">
@@ -80,16 +78,17 @@ def process_pil_image_to_bytes(img, rotate_degrees=0):
             img = img.rotate(-rotate_degrees, expand=True)
 
         img = img.convert("RGB")
-        img.thumbnail((500, 500))
+        img.thumbnail((600, 600))
         
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=70, optimize=True)
+        img.save(buffered, format="JPEG", quality=75, optimize=True)
         return buffered.getvalue()
     except Exception as e:
         st.error(f"Fel vid bildbehandling: {e}")
         return None
 
 def upload_image_to_github(img_bytes):
+    """Laddar upp bilden som fil till GitHub och returnerar en ren raw-URL."""
     if not GITHUB_TOKEN or not GITHUB_REPO or not img_bytes:
         return ""
     
@@ -105,9 +104,8 @@ def upload_image_to_github(img_bytes):
     
     res = requests.put(url, json=payload, headers=headers)
     if res.status_code in [200, 201]:
-        # Använder github.com/raw/ med tidsstämpel för att kringgå CDN-fördröjningen
-        ts = int(time.time())
-        return f"https://github.com/{GITHUB_REPO}/raw/main/{filename}?v={ts}"
+        clean_repo = GITHUB_REPO.strip("/")
+        return f"https://raw.githubusercontent.com/{clean_repo}/main/{filename}"
     else:
         st.error(f"Kunde inte ladda upp bilden till GitHub: {res.text}")
         return ""
@@ -237,7 +235,7 @@ def show_card_dialog(selected_index, card_data):
     else:
         st.session_state[rot_key] = 0
         raw_img = card_data.get("Bild", "")
-        if raw_img and isinstance(raw_img, str) and (raw_img.startswith("http") or raw_img.startswith("data:image")):
+        if raw_img and isinstance(raw_img, str) and raw_img.startswith("http"):
             st.image(raw_img, caption="Nuvarande sparad bild")
         else:
             st.info("Ingen bild finns sparad för detta kort ännu.")
@@ -260,14 +258,14 @@ with tab1:
 
         def sanitize_img(val):
             if val is None:
-                return ""
+                return None
             s_val = str(val).strip()
-            if s_val.startswith("http") or s_val.startswith("data:image"):
+            # Säkerställer att länken accepteras korrekt av Streamlits ImageColumn
+            if s_val.startswith("http://") or s_val.startswith("https://"):
                 return s_val
-            return ""
+            return None
 
         collection_df["Bild"] = collection_df["Bild"].apply(sanitize_img)
-
         df_display = collection_df.copy()
         
         df_display["Värde (EUR)"] = pd.to_numeric(df_display["Värde (EUR)"], errors='coerce').fillna(0.0)
@@ -352,7 +350,8 @@ with tab1:
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
-            event = st.dataframe(
+            # I läsläget används st.dataframe vilket renderar ImageColumn extremt pålitligt
+            st.dataframe(
                 df_display,
                 column_order=columns_order,
                 column_config=column_config,
@@ -361,20 +360,6 @@ with tab1:
                 on_select="rerun",
                 selection_mode="single-row"
             )
-
-            selected_rows = event.selection.get("rows", [])
-            if selected_rows:
-                selected_idx = selected_rows[0]
-                card_item = app_data["collection"][selected_idx]
-                raw_img = card_item.get("Bild", "")
-                
-                with image_preview_container:
-                    st.markdown(f"### 🔍 {card_item.get('Namn')} ({card_item.get('Set')})")
-                    if raw_img and isinstance(raw_img, str) and (raw_img.startswith("http") or raw_img.startswith("data:image")):
-                        st.image(raw_img, use_container_width=True)
-                    else:
-                        st.info("Detta kort har ingen bild sparad ännu.")
-                    st.divider()
 
         total_value_sek = df_display["Värde idag (SEK)"].sum()
         total_cost_sek = df_display["Köpt för (SEK)"].sum()
