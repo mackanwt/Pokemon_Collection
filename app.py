@@ -68,6 +68,9 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
 FILE_PATH = "data.json"
 
+if "temp_image_cache" not in st.session_state:
+    st.session_state["temp_image_cache"] = {}
+
 def process_pil_image_to_bytes(img, rotate_degrees=0):
     try:
         try:
@@ -89,7 +92,7 @@ def process_pil_image_to_bytes(img, rotate_degrees=0):
         return None
 
 def upload_image_to_github(img_bytes):
-    """Laddar upp bilden till GitHub och returnerar URL."""
+    """Laddar upp bilden till GitHub och returnerar public URL."""
     if not GITHUB_TOKEN or not GITHUB_REPO or not img_bytes:
         return ""
     
@@ -106,9 +109,7 @@ def upload_image_to_github(img_bytes):
     res = requests.put(url, json=payload, headers=headers)
     if res.status_code in [200, 201]:
         clean_repo = GITHUB_REPO.strip("/")
-        # Tvinga cache-busting med tidsstämpel så att Streamlit laddar den direkt
-        timestamp = int(time.time())
-        return f"https://raw.githubusercontent.com/{clean_repo}/main/{filename}?v={timestamp}"
+        return f"https://raw.githubusercontent.com/{clean_repo}/main/{filename}"
     else:
         st.error(f"Kunde inte ladda upp bilden till GitHub: {res.text}")
         return ""
@@ -223,8 +224,13 @@ def show_card_dialog(selected_index, card_data):
                 img_url = upload_image_to_github(img_bytes)
                 
                 if img_url:
+                    # Spara GitHub URL i data.json
                     app_data["collection"][selected_index]["Bild"] = img_url
                     save_data_to_github(app_data)
+                    
+                    # Spara tillfällig Base64 i sessionen så att den syns direkt i tabellen innan GitHub CDN vaknar
+                    b64_str = f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
+                    st.session_state["temp_image_cache"][img_url] = b64_str
                     
                     st.session_state["editor_version"] += 1
                     
@@ -233,7 +239,7 @@ def show_card_dialog(selected_index, card_data):
                     if "open_dialog_index" in st.session_state:
                         del st.session_state["open_dialog_index"]
 
-                    st.success("Bilden laddades upp och sparades!")
+                    st.success("Bilden sparades!")
                     st.rerun()
     else:
         st.session_state[rot_key] = 0
@@ -251,8 +257,6 @@ with tab1:
     st.subheader("Min Samling")
     edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
     
-    image_preview_container = st.container()
-
     collection_df = pd.DataFrame(app_data.get("collection", []))
     
     if not collection_df.empty:
@@ -263,7 +267,9 @@ with tab1:
             if not val:
                 return ""
             s_val = str(val).strip()
-            # Tillåt både webblänkar (HTTP/HTTPS) och tidigare sparade Base64-bilder
+            # Om bilden är ny och finns i sessionens snabb-cache, använd den direkt
+            if s_val in st.session_state["temp_image_cache"]:
+                return st.session_state["temp_image_cache"][s_val]
             if s_val.startswith("http://") or s_val.startswith("https://") or s_val.startswith("data:image"):
                 return s_val
             return ""
@@ -477,6 +483,9 @@ with tab3:
                 if pil_img_new:
                     img_bytes = process_pil_image_to_bytes(pil_img_new, rotate_degrees=st.session_state.get("new_card_rotation", 0))
                     img_url = upload_image_to_github(img_bytes)
+                    if img_url:
+                        b64_str = f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
+                        st.session_state["temp_image_cache"][img_url] = b64_str
             
             new_card = {
                 "Bild": img_url,
