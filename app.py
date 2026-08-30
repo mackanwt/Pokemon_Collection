@@ -7,6 +7,7 @@ from datetime import date
 from PIL import Image, ImageOps
 import io
 import uuid
+import time
 
 # --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -79,10 +80,10 @@ def process_pil_image_to_bytes(img, rotate_degrees=0):
             img = img.rotate(-rotate_degrees, expand=True)
 
         img = img.convert("RGB")
-        img.thumbnail((600, 600))
+        img.thumbnail((500, 500))
         
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=75, optimize=True)
+        img.save(buffered, format="JPEG", quality=70, optimize=True)
         return buffered.getvalue()
     except Exception as e:
         st.error(f"Fel vid bildbehandling: {e}")
@@ -104,7 +105,9 @@ def upload_image_to_github(img_bytes):
     
     res = requests.put(url, json=payload, headers=headers)
     if res.status_code in [200, 201]:
-        return f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{filename}"
+        # Använder github.com/raw/ med tidsstämpel för att kringgå CDN-fördröjningen
+        ts = int(time.time())
+        return f"https://github.com/{GITHUB_REPO}/raw/main/{filename}?v={ts}"
     else:
         st.error(f"Kunde inte ladda upp bilden till GitHub: {res.text}")
         return ""
@@ -183,7 +186,7 @@ if not app_data:
 
 current_rate = 11.5
 
-# --- DIALOGRUTA FÖR BILDER MED ROTERING & SPA-KNAPP ---
+# --- DIALOGRUTA FÖR BILDER MED ROTERING & SPARA-KNAPP ---
 @st.dialog("🎴 Kortdetaljer & Välj bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
