@@ -6,6 +6,7 @@ import requests
 from datetime import date
 from PIL import Image, ImageOps
 import io
+import uuid
 
 # --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -62,8 +63,13 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- HJÄLPFUNKTION FÖR BILD-OMVANDLING OCH ROTATION (HÅRD KOMPRIMERING) ---
-def process_pil_image(img, rotate_degrees=0):
+# --- GITHUB CONFIG & INTEGRATION ---
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
+GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
+FILE_PATH = "data.json"
+
+def process_pil_image_to_bytes(img, rotate_degrees=0):
+    """Komprimerar och roterar bilden och returnerar råa JPEG-bytes."""
     try:
         try:
             img = ImageOps.exif_transpose(img)
@@ -74,14 +80,36 @@ def process_pil_image(img, rotate_degrees=0):
             img = img.rotate(-rotate_degrees, expand=True)
 
         img = img.convert("RGB")
-        img.thumbnail((400, 400))
+        img.thumbnail((600, 600))
         
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=55, optimize=True)
-        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-        return f"data:image/jpeg;base64,{img_str}"
+        img.save(buffered, format="JPEG", quality=75, optimize=True)
+        return buffered.getvalue()
     except Exception as e:
         st.error(f"Fel vid bildbehandling: {e}")
+        return None
+
+def upload_image_to_github(img_bytes):
+    """Laddar upp bildfilen direkt till images/-mappen på GitHub och returnerar dess URL."""
+    if not GITHUB_TOKEN or not GITHUB_REPO or not img_bytes:
+        return ""
+    
+    filename = f"images/card_{uuid.uuid4().hex[:10]}.jpg"
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    
+    encoded_content = base64.b64encode(img_bytes).decode('utf-8')
+    payload = {
+        "message": f"Laddade upp bild: {filename}",
+        "content": encoded_content
+    }
+    
+    res = requests.put(url, json=payload, headers=headers)
+    if res.status_code in [200, 201]:
+        # Returnera direktlänk via raw.githubusercontent.com
+        return f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{filename}"
+    else:
+        st.error(f"Kunde inte ladda upp bilden till GitHub: {res.text}")
         return ""
 
 def get_pil_from_uploaded_file(file_buffer):
@@ -96,11 +124,6 @@ def get_pil_from_uploaded_file(file_buffer):
         return img
     except Exception:
         return None
-
-# --- GITHUB INTEGRATION (SÄKER INLÄSNING VIA RAW RAW-URL) ---
-GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
-GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
-FILE_PATH = "data.json"
 
 def load_data_from_github():
     if not GITHUB_TOKEN or not GITHUB_REPO:
@@ -135,18 +158,6 @@ def save_data_to_github(data_dict):
     res = requests.get(url, headers=headers)
     sha = res.json()["sha"] if res.status_code == 200 else None
     
-    clean_collection = []
-    for item in data_dict.get("collection", []):
-        clean_item = dict(item)
-        if "Bild" in clean_item:
-            val = str(clean_item["Bild"]) if clean_item["Bild"] is not None else ""
-            if not (val.startswith("data:image") or val.startswith("http")):
-                val = ""
-            clean_item["Bild"] = val
-        clean_collection.append(clean_item)
-    
-    data_dict["collection"] = clean_collection
-    
     content_str = json.dumps(data_dict, indent=2, ensure_ascii=False)
     encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
     
@@ -159,6 +170,10 @@ def save_data_to_github(data_dict):
         
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
+
+# Initiera unikt ID för editerar-cachen om det saknas
+if "editor_version" not in st.session_state:
+    st.session_state["editor_version"] = 0
 
 # Ladda data
 app_data = load_data_from_github()
@@ -204,36 +219,28 @@ def show_card_dialog(selected_index, card_data):
             st.image(preview_img, caption=f"Förhandsvisning (Rotation: {current_rot}°)")
             
             if st.button("💾 Spara denna bild på kortet", type="primary", use_container_width=True, key=f"save_img_btn_{selected_index}"):
-                img_b64 = process_pil_image(pil_img, rotate_degrees=current_rot)
-                if img_b64:
-                    app_data["collection"][selected_index]["Bild"] = img_b64
-                    save_data_to_github(app_data)
+                with st.spinner("Laddar upp bilden till GitHub..."):
+                    img_bytes = process_pil_image_to_bytes(pil_img, rotate_degrees=current_rot)
+                    img_url = upload_image_to_github(img_bytes)
                     
-                    if rot_key in st.session_state:
-                        del st.session_state[rot_key]
-                    if "open_dialog_index" in st.session_state:
-                        del st.session_state["open_dialog_index"]
-                    
-                    # Rensa Streamlit-tillstånd för editerarna så att nya bilden läses in
-                    for key in list(st.session_state.keys()):
-                        if "editor" in key or "main_collection_editor" in key:
-                            del st.session_state[key]
+                    if img_url:
+                        app_data["collection"][selected_index]["Bild"] = img_url
+                        save_data_to_github(app_data)
+                        
+                        st.session_state["editor_version"] += 1
+                        
+                        if rot_key in st.session_state:
+                            del st.session_state[rot_key]
+                        if "open_dialog_index" in st.session_state:
+                            del st.session_state["open_dialog_index"]
 
-                    st.success("Bilden sparades!")
-                    st.rerun()
+                        st.success("Bilden laddades upp och sparades!")
+                        st.rerun()
     else:
         st.session_state[rot_key] = 0
         raw_img = card_data.get("Bild", "")
-        if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
-            try:
-                if raw_img.startswith("data:image"):
-                    base64_data = raw_img.split(",")[1]
-                    img_bytes = base64.b64decode(base64_data)
-                    st.image(Image.open(io.BytesIO(img_bytes)), caption="Nuvarande sparad bild")
-                else:
-                    st.image(raw_img, caption="Nuvarande sparad bild")
-            except Exception:
-                st.info("Ingen bild finns sparad för detta kort ännu.")
+        if raw_img and isinstance(raw_img, str) and (raw_img.startswith("http") or raw_img.startswith("data:image")):
+            st.image(raw_img, caption="Nuvarande sparad bild")
         else:
             st.info("Ingen bild finns sparad för detta kort ännu.")
 
@@ -257,7 +264,7 @@ with tab1:
             if val is None:
                 return ""
             s_val = str(val).strip()
-            if s_val.startswith("data:image") or s_val.startswith("http"):
+            if s_val.startswith("http") or s_val.startswith("data:image"):
                 return s_val
             return ""
 
@@ -294,13 +301,15 @@ with tab1:
         }
         
         if edit_mode:
+            editor_key = f"main_editor_v_{st.session_state['editor_version']}"
+            
             edited_df = st.data_editor(
                 df_display,
                 column_order=columns_order,
                 column_config=column_config,
                 num_rows="dynamic",
                 use_container_width=True,
-                key="main_collection_editor"
+                key=editor_key
             )
             
             st.divider()
@@ -336,16 +345,12 @@ with tab1:
                 edited_records = edited_df.to_dict(orient="records")
                 for idx, record in enumerate(edited_records):
                     if idx < len(app_data["collection"]):
-                        # Om editeraren tömt bilden, behåll befintlig bild från app_data
                         if not record.get("Bild"):
                             record["Bild"] = app_data["collection"][idx].get("Bild", "")
                 app_data["collection"] = edited_records
                 save_data_to_github(app_data)
                 
-                for key in list(st.session_state.keys()):
-                    if "editor" in key or "main_collection_editor" in key:
-                        del st.session_state[key]
-                        
+                st.session_state["editor_version"] += 1
                 st.success("Samlingen sparades!")
                 st.rerun()
         else:
@@ -367,17 +372,8 @@ with tab1:
                 
                 with image_preview_container:
                     st.markdown(f"### 🔍 {card_item.get('Namn')} ({card_item.get('Set')})")
-                    
-                    if raw_img and isinstance(raw_img, str) and (raw_img.startswith("data:image") or raw_img.startswith("http")):
-                        try:
-                            if raw_img.startswith("data:image"):
-                                base64_data = raw_img.split(",")[1]
-                                img_bytes = base64.b64decode(base64_data)
-                                st.image(Image.open(io.BytesIO(img_bytes)), use_container_width=True)
-                            else:
-                                st.image(raw_img, use_container_width=True)
-                        except Exception:
-                            st.error("Kunde inte ladda bilden.")
+                    if raw_img and isinstance(raw_img, str) and (raw_img.startswith("http") or raw_img.startswith("data:image")):
+                        st.image(raw_img, use_container_width=True)
                     else:
                         st.info("Detta kort har ingen bild sparad ännu.")
                     st.divider()
@@ -423,13 +419,14 @@ with tab2:
             "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
         }
 
+        tab2_key = f"text_editor_v_{st.session_state['editor_version']}"
         edited_df = st.data_editor(
             df_display,
             column_order=columns_order,
             column_config=editable_config,
             num_rows="dynamic",
             use_container_width=True,
-            key="text_editor_grid"
+            key=tab2_key
         )
         
         if st.button("💾 Spara alla textändringar till GitHub", type="primary"):
@@ -441,10 +438,7 @@ with tab2:
             app_data["collection"] = edited_records
             save_data_to_github(app_data)
             
-            for key in list(st.session_state.keys()):
-                if "editor" in key or "text_editor_grid" in key:
-                    del st.session_state[key]
-
+            st.session_state["editor_version"] += 1
             st.success("Samlingen sparades!")
             st.rerun()
 
@@ -494,14 +488,15 @@ with tab3:
             varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
         
         if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
-            img_b64 = ""
+            img_url = ""
             if new_uploaded_file:
                 pil_img_new = get_pil_from_uploaded_file(new_uploaded_file)
                 if pil_img_new:
-                    img_b64 = process_pil_image(pil_img_new, rotate_degrees=st.session_state.get("new_card_rotation", 0))
+                    img_bytes = process_pil_image_to_bytes(pil_img_new, rotate_degrees=st.session_state.get("new_card_rotation", 0))
+                    img_url = upload_image_to_github(img_bytes)
             
             new_card = {
-                "Bild": img_b64,
+                "Bild": img_url,
                 "Pärmnummer": parm,
                 "Språk": sprak,
                 "Namn": namn,
@@ -521,9 +516,7 @@ with tab3:
             save_data_to_github(app_data)
             
             st.session_state["new_card_rotation"] = 0
-            for key in list(st.session_state.keys()):
-                if "editor" in key:
-                    del st.session_state[key]
+            st.session_state["editor_version"] += 1
 
             st.success(f"Kortet {namn} skapades och sparades!")
             st.rerun()
