@@ -69,7 +69,6 @@ GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
 FILE_PATH = "data.json"
 
 def process_pil_image_to_bytes(img, rotate_degrees=0):
-    """Komprimerar och roterar bilden och returnerar råa JPEG-bytes."""
     try:
         try:
             img = ImageOps.exif_transpose(img)
@@ -90,7 +89,6 @@ def process_pil_image_to_bytes(img, rotate_degrees=0):
         return None
 
 def upload_image_to_github(img_bytes):
-    """Laddar upp bildfilen direkt till images/-mappen på GitHub och returnerar dess URL."""
     if not GITHUB_TOKEN or not GITHUB_REPO or not img_bytes:
         return ""
     
@@ -106,7 +104,6 @@ def upload_image_to_github(img_bytes):
     
     res = requests.put(url, json=payload, headers=headers)
     if res.status_code in [200, 201]:
-        # Returnera direktlänk via raw.githubusercontent.com
         return f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{filename}"
     else:
         st.error(f"Kunde inte ladda upp bilden till GitHub: {res.text}")
@@ -171,11 +168,9 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-# Initiera unikt ID för editerar-cachen om det saknas
 if "editor_version" not in st.session_state:
     st.session_state["editor_version"] = 0
 
-# Ladda data
 app_data = load_data_from_github()
 if not app_data:
     app_data = {
@@ -188,7 +183,7 @@ if not app_data:
 
 current_rate = 11.5
 
-# DIALOGRUTA FÖR BILDER MED ROTERING
+# --- DIALOGRUTA FÖR BILDER MED ROTERING & SPA-KNAPP ---
 @st.dialog("🎴 Kortdetaljer & Välj bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -200,42 +195,42 @@ def show_card_dialog(selected_index, card_data):
 
     uploaded_file = st.file_uploader("🖼️ Välj bild från galleriet/filerna", type=["jpg", "jpeg", "png"], key=f"dialog_upload_{selected_index}")
     
-    if uploaded_file is not None:
-        pil_img = get_pil_from_uploaded_file(uploaded_file)
-        if pil_img:
-            col_left, col_right = st.columns(2)
-            with col_left:
-                if st.button("🔄 Rotera 90° Vänster", key=f"rot_left_{selected_index}", use_container_width=True):
-                    st.session_state[rot_key] = (st.session_state[rot_key] - 90) % 360
-                    st.rerun()
-            with col_right:
-                if st.button("🔄 Rotera 90° Höger", key=f"rot_right_{selected_index}", use_container_width=True):
-                    st.session_state[rot_key] = (st.session_state[rot_key] + 90) % 360
-                    st.rerun()
+    pil_img = get_pil_from_uploaded_file(uploaded_file) if uploaded_file else None
 
-            current_rot = st.session_state[rot_key]
-            preview_img = pil_img.rotate(-current_rot, expand=True) if current_rot != 0 else pil_img
-            
-            st.image(preview_img, caption=f"Förhandsvisning (Rotation: {current_rot}°)")
-            
-            if st.button("💾 Spara denna bild på kortet", type="primary", use_container_width=True, key=f"save_img_btn_{selected_index}"):
-                with st.spinner("Laddar upp bilden till GitHub..."):
-                    img_bytes = process_pil_image_to_bytes(pil_img, rotate_degrees=current_rot)
-                    img_url = upload_image_to_github(img_bytes)
+    if pil_img:
+        col_left, col_right = st.columns(2)
+        with col_left:
+            if st.button("🔄 Rotera 90° Vänster", key=f"rot_left_{selected_index}", use_container_width=True):
+                st.session_state[rot_key] = (st.session_state[rot_key] - 90) % 360
+                st.rerun()
+        with col_right:
+            if st.button("🔄 Rotera 90° Höger", key=f"rot_right_{selected_index}", use_container_width=True):
+                st.session_state[rot_key] = (st.session_state[rot_key] + 90) % 360
+                st.rerun()
+
+        current_rot = st.session_state[rot_key]
+        preview_img = pil_img.rotate(-current_rot, expand=True) if current_rot != 0 else pil_img
+        
+        st.image(preview_img, caption=f"Förhandsvisning (Rotation: {current_rot}°)")
+        
+        if st.button("💾 Spara denna bild på kortet", type="primary", use_container_width=True, key=f"save_img_btn_{selected_index}"):
+            with st.spinner("Laddar upp bilden till GitHub..."):
+                img_bytes = process_pil_image_to_bytes(pil_img, rotate_degrees=current_rot)
+                img_url = upload_image_to_github(img_bytes)
+                
+                if img_url:
+                    app_data["collection"][selected_index]["Bild"] = img_url
+                    save_data_to_github(app_data)
                     
-                    if img_url:
-                        app_data["collection"][selected_index]["Bild"] = img_url
-                        save_data_to_github(app_data)
-                        
-                        st.session_state["editor_version"] += 1
-                        
-                        if rot_key in st.session_state:
-                            del st.session_state[rot_key]
-                        if "open_dialog_index" in st.session_state:
-                            del st.session_state["open_dialog_index"]
+                    st.session_state["editor_version"] += 1
+                    
+                    if rot_key in st.session_state:
+                        del st.session_state[rot_key]
+                    if "open_dialog_index" in st.session_state:
+                        del st.session_state["open_dialog_index"]
 
-                        st.success("Bilden laddades upp och sparades!")
-                        st.rerun()
+                    st.success("Bilden laddades upp och sparades!")
+                    st.rerun()
     else:
         st.session_state[rot_key] = 0
         raw_img = card_data.get("Bild", "")
