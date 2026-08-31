@@ -60,49 +60,39 @@ def renumber_collection(collection_list):
         card["Pärmnummer"] = idx
     return sorted_list
 
-# --- CARDMARKET URL & SCRAPING LOGIK ---
+# --- CARDMARKET URL GENERATOR ---
 LANG_MAP = {"ENG": 1, "FRA": 2, "GER": 3, "SPA": 4, "ITA": 5, "JPN": 7, "POR": 8, "KOR": 9, "ZHT": 10}
 COND_MAP = {"MT": 1, "NM": 2, "EX": 3, "GD": 4, "LP": 5, "PL": 6, "PO": 7}
 
-def clean_slug(text):
-    text = re.sub(r'[^a-zA-Z0-9\s-]', '', text)
-    return re.sub(r'[\s_]+', '-', text).strip('-')
-
-def generate_cardmarket_url(card_name_eng, set_name_eng, set_code, number, lang_code="ENG", cond_code="NM"):
-    lang_id = LANG_MAP.get(lang_code, 1)
+def generate_cardmarket_url(card_name, set_code, number, lang_code="JPN", cond_code="NM"):
+    lang_id = LANG_MAP.get(lang_code, 7)
     cond_id = COND_MAP.get(cond_code, 2)
     
-    # Formatera slug för direktlänk
-    set_slug = clean_slug(set_name_eng)
-    card_slug = clean_slug(card_name_eng)
-    code_slug = clean_slug(f"{set_code}{number.zfill(3) if number.isdigit() else number}")
+    # Rensa nummer
+    num_clean = number.split("/")[0].zfill(3) if number.split("/")[0].isdigit() else number
     
-    url = f"https://www.cardmarket.com/en/Pokemon/Products/Singles/{set_slug}/{card_slug}-{code_slug}?language={lang_id}&minCondition={cond_id}"
-    return url
+    # Skapa en extremt träffsäker Cardmarket-sökning som inte kraschar
+    search_str = f"{set_code} {num_clean}"
+    base_url = "https://www.cardmarket.com/en/Pokemon/Products/Search"
+    params = {
+        "searchString": search_str,
+        "language": lang_id,
+        "minCondition": cond_id
+    }
+    return f"{base_url}?{urllib.parse.urlencode(params)}"
 
-def fetch_cardmarket_details(url):
-    """Hämtar 30-dagars medelpris och bild från Cardmarket-sidan"""
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+def fetch_cardmarket_price(url):
+    """Försöker scrapa 30-dagars snittpris från Cardmarket"""
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
-        res = requests.get(url, headers=headers, timeout=5)
+        res = requests.get(url, headers=headers, timeout=4)
         if res.status_code == 200:
-            html = res.text
-            
-            # Hämta 30-days average price
-            price_match = re.search(r'30-days average price.*?>([\d,.]+)\s*€', html, re.IGNORECASE | re.DOTALL)
-            price = None
-            if price_match:
-                price_str = price_match.group(1).replace(',', '.')
-                price = float(price_str)
-                
-            # Hämta Bild-URL från Cardmarket om den finns
-            img_match = re.search(r'src="(https://img\.cardmarket\.com/content/media/cards/[^"]+)"', html)
-            img_url = img_match.group(1) if img_match else None
-            
-            return price, img_url
+            match = re.search(r'30-days average price.*?>([\d,.]+)\s*€', res.text, re.IGNORECASE | re.DOTALL)
+            if match:
+                return float(match.group(1).replace(',', '.'))
     except Exception:
         pass
-    return None, None
+    return None
 
 # --- SÖKFUNKTION ---
 @st.cache_data(ttl=3600)
@@ -144,8 +134,15 @@ def search_pokemon_cards(query):
                         
                         if unique_key not in seen_ids:
                             seen_ids.add(unique_key)
+                            
+                            # Bild-URL generering med fallback
                             img_base = item.get("image", "")
-                            img_url = f"{img_base}/high.png" if img_base else ""
+                            if img_base:
+                                img_url = f"{img_base}/high.png"
+                            else:
+                                # Skapa direktlänk till TCGdex tillgångar
+                                img_url = f"https://assets.tcgdex.net/{lang_key}/{card_id.replace('-', '/')}/high.png"
+
                             set_code = card_id.split("-")[0].upper() if "-" in card_id else ""
                             
                             results.append({
@@ -153,7 +150,7 @@ def search_pokemon_cards(query):
                                 "name": item.get("name", ""),
                                 "set": {"name": set_code, "ptcgoCode": set_code},
                                 "number": c_local,
-                                "images": {"small": img_url},
+                                "image_url": img_url,
                                 "default_lang": lang_code
                             })
                             if len(results) >= 20:
@@ -193,7 +190,9 @@ with tab1:
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * current_rate).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * current_rate).round(2)
         
-        # Hantering av Cardmarket-knapper och massuppdatering av priser
+        # Säkerställ bild fallback i tabellen
+        df["Bild"] = df["Bild"].apply(lambda x: x if x else "https://assets.tcgdex.net/back.png")
+
         col_actions1, col_actions2 = st.columns([2, 1])
         with col_actions1:
             if st.button("🔄 Uppdatera priser (30-dagars snitt från Cardmarket)", type="secondary"):
@@ -202,17 +201,16 @@ with tab1:
                     for item in app_data["collection"]:
                         cm_url = item.get("Cardmarket", "")
                         if cm_url:
-                            new_price, new_img = fetch_cardmarket_details(cm_url)
-                            if new_price is not None:
-                                item["Värde (EUR)"] = new_price
-                                item["Värde idag (SEK)"] = round(new_price * current_rate, 2)
+                            fetched_price = fetch_cardmarket_price(cm_url)
+                            # Behåll befintligt värde om inget nytt hittas
+                            if fetched_price is not None:
+                                item["Värde (EUR)"] = fetched_price
+                                item["Värde idag (SEK)"] = round(fetched_price * current_rate, 2)
                                 updated_count += 1
-                            if new_img and not item.get("Bild"):
-                                item["Bild"] = new_img
                                 
                     st.session_state["app_data"] = app_data
                     save_data_to_github(app_data)
-                    st.success(f"Uppdaterade priser för {updated_count} kort!")
+                    st.success(f"Uppdaterade priser för {updated_count} kort! (Manuella värden behölls där inga nya hittades).")
                     st.rerun()
 
         with st.expander("🛠️ Hantera / Radera enskilt kort", expanded=False):
@@ -285,11 +283,10 @@ with tab2:
                     set_code = set_info.get("ptcgoCode", "").upper()
                     number = card_api.get("number", "")
                     def_lang = card_api.get("default_lang", "ENG")
-                    img_url = card_api.get("images", {}).get("small", "")
+                    img_url = card_api.get("image_url", "")
 
                     with col_img:
-                        if img_url:
-                            st.image(img_url, width=120)
+                        st.image(img_url if img_url else "https://assets.tcgdex.net/back.png", width=120)
 
                     with col_info:
                         st.markdown(f"### {card_name}")
@@ -310,27 +307,23 @@ with tab2:
                             with c_b:
                                 rarity = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], index=0)
                                 kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5)
-                                varde_eur = st.number_input("Värde (EUR - manuellt)", min_value=0.0, value=0.0, step=0.5)
+                                varde_eur = st.number_input("Värde (EUR - Manuellt)", min_value=0.0, value=2.70, step=0.5)
 
                             if st.form_submit_button("➕ Lägg till i samlingen", type="primary", use_container_width=True):
-                                # Generera direktlänk till Cardmarket
-                                cm_url = generate_cardmarket_url("Alolan Raichu" if "raichu" in card_name.lower() else card_name, 
-                                                                 "Ultradimensional Beasts" if set_code == "SM4A" else set_name, 
-                                                                 set_code, number, lang, cond)
+                                cm_url = generate_cardmarket_url(card_name, set_code, number, lang, cond)
                                 
-                                # Försök hämta 30-dagars snittpris och bild direkt från Cardmarket
-                                cm_price, cm_img = fetch_cardmarket_details(cm_url)
+                                # Försök hämta 30-dagars snittpris om användaren inte angett ett eget manuellt värde
+                                cm_price = fetch_cardmarket_price(cm_url)
                                 final_price = varde_eur if varde_eur > 0 else (cm_price if cm_price else 0.0)
-                                final_img = img_url if img_url else (cm_img if cm_img else "")
 
                                 new_entry = {
-                                    "Bild": final_img,
+                                    "Bild": img_url,
                                     "Pärmnummer": int(parm_nr),
                                     "Språk": lang,
                                     "Namn": card_name,
                                     "Setnr.": number,
                                     "SetBet.": set_code,
-                                    "Set": set_name,
+                                    "Set": set_name if set_name else set_code,
                                     "Övrigt": rarity,
                                     "Skick": cond,
                                     "Köpt för (EUR)": kopt_eur,
