@@ -83,89 +83,102 @@ def generate_cardmarket_url(card_name, set_name, set_nr, lang_code, cond_code):
     }
     return f"{base_search_url}?{urllib.parse.urlencode(params)}"
 
-# --- SMART FLERSPRÅKIG & MULTI-FÄLT SÖKNING ---
+# --- AVANCERAD & OPTERAD MULTI-SÖKNING ---
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
     if not query:
         return []
     
-    query = query.strip()
+    query_clean = query.strip().lower()
+    search_words = re.split(r'[\s/]+', query_clean) # Delar upp på blanksteg och snedstreck
+    
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     results = []
     seen_ids = set()
-
-    # Rensa numret om användaren söker på t.ex. "016/050" -> "016" och "16"
-    clean_num = query.split("/")[0].strip()
-    stripped_num = clean_num.lstrip("0") if clean_num.isdigit() else clean_num
 
     LANG_CODES = {
         "ja": "JPN", "en": "ENG", "fr": "FRA", "de": "GER", 
         "es": "SPA", "it": "ITA", "pt": "POR", "ko": "KOR", "zh-tw": "ZHT"
     }
 
-    # 1. TCGdex API (Bred sökning på Namn, Set & Kortnummer)
+    # 1. TCGdex API Sökning
     for lang_key, lang_code in LANG_CODES.items():
         try:
-            # Hämta alla kort från språket
             url_tcgdex = f"https://api.tcgdex.net/v2/{lang_key}/cards"
-            res_dex = requests.get(url_tcgdex, headers=headers, timeout=3)
+            res_dex = requests.get(url_tcgdex, headers=headers, timeout=4)
             
             if res_dex.status_code == 200:
                 cards_list = res_dex.json()
                 
-                # Filtrera lokalt på namn, localId (kortnr) eller set ID (t.ex. sm4a)
-                matched_cards = []
-                q_lower = query.lower()
-                
                 for item in cards_list:
-                    c_id = item.get("id", "").lower()
-                    c_name = item.get("name", "").lower()
+                    c_id = str(item.get("id", "")).lower()
+                    c_name = str(item.get("name", "")).lower()
                     c_local = str(item.get("localId", "")).lower()
+                    c_local_clean = c_local.lstrip("0")
                     
-                    # Matchningsvillkor
-                    if (q_lower in c_name) or (clean_num == c_local) or (stripped_num == c_local) or (q_lower in c_id):
-                        matched_cards.append(item)
-                        if len(matched_cards) >= 6:
+                    # Kontrollera om ALLA sökord finns i antingen ID, Namn eller Kortnummer
+                    matches_all = True
+                    for word in search_words:
+                        if not word:
+                            continue
+                        word_clean = word.lstrip("0") if word.isdigit() else word
+                        
+                        in_id = word in c_id
+                        in_name = word in c_name
+                        in_local = (word == c_local) or (word_clean == c_local_clean)
+                        
+                        if not (in_id or in_name or in_local):
+                            matches_all = False
                             break
-
-                for item in matched_cards:
-                    card_id = item.get("id", "")
-                    unique_key = f"{card_id}_{lang_code}"
                     
-                    if unique_key not in seen_ids:
-                        seen_ids.add(unique_key)
-                        c_res = requests.get(f"https://api.tcgdex.net/v2/{lang_key}/cards/{card_id}", headers=headers, timeout=2)
-                        if c_res.status_code == 200:
-                            c = c_res.json()
-                            set_id = c.get("set", {}).get("id", "").upper()
+                    if matches_all:
+                        card_id = item.get("id", "")
+                        unique_key = f"{card_id}_{lang_code}"
+                        
+                        if unique_key not in seen_ids:
+                            seen_ids.add(unique_key)
+                            
+                            # Generera bildlänk direkt från TCGdexcdn
+                            img_url = item.get("image", "")
+                            if img_url:
+                                img_url = f"{img_url}/high.png"
+                            else:
+                                img_url = f"https://assets.tcgdex.net/{lang_key}/{card_id}/high.png"
+
+                            # Extrahera setkod
+                            set_code = card_id.split("-")[0].upper() if "-" in card_id else ""
+                            
                             results.append({
                                 "id": unique_key,
-                                "name": c.get("name"),
+                                "name": item.get("name", ""),
                                 "set": {
-                                    "name": c.get("set", {}).get("name", ""),
-                                    "ptcgoCode": set_id,
-                                    "printedTotal": c.get("set", {}).get("cardCount", {}).get("official", "")
+                                    "name": set_code,
+                                    "ptcgoCode": set_code,
+                                    "printedTotal": ""
                                 },
-                                "number": c.get("localId", ""),
-                                "images": {"small": f"{c.get('image')}/low.png" if c.get('image') else ""},
+                                "number": c_local,
+                                "images": {"small": img_url},
                                 "cardmarket": {"prices": {"averageSellPrice": 0.0}},
                                 "default_lang": lang_code
                             })
+                            
+                            if len(results) >= 40: # Tillåt upp till 40 träffar
+                                break
         except Exception:
             pass
             
-        if len(results) >= 12:
+        if len(results) >= 40:
             break
 
-    # 2. Pokémon TCG API (Engelsk Reserv)
+    # 2. Pokémon TCG API (Västerländsk reservom TCGdex missar)
     if not results:
         try:
-            q_str = f"name:\"{query}*\" OR number:\"{clean_num}\" OR number:\"{stripped_num}\" OR set.id:\"{query.lower()}\" OR set.ptcgoCode:\"{query.upper()}\""
+            q_str = f"name:\"{query}*\" OR number:\"{query_clean}\""
             url = f"https://api.pokemontcg.io/v2/cards?q={urllib.parse.quote(q_str)}"
-            res = requests.get(url, headers=headers, timeout=5)
+            res = requests.get(url, headers=headers, timeout=4)
             if res.status_code == 200:
                 data = res.json().get("data", [])
-                for d in data[:10]:
+                for d in data[:20]:
                     d["default_lang"] = "ENG"
                     results.append(d)
         except Exception:
@@ -278,12 +291,12 @@ with tab1:
 
 # --- FLIK 2: SÖK & LÄGG TILL ---
 with tab2:
-    st.subheader("🔍 Sök på Namn, Nummer (t.ex. 016/050) eller Setkod (t.ex. sm4a)")
+    st.subheader("🔍 Sök på Namn, Nummer eller Setkod")
     
-    search_query = st.text_input("Skriv sökord:", key="card_search_input")
+    search_query = st.text_input("Sökexempel: 'sm4a', 'sm4a 016', '016/050' eller 'Raichu':", key="card_search_input")
     
     if search_query:
-        with st.spinner("Söker och matchar kortnummer, setkoder och namn..."):
+        with st.spinner("Söker och hämtar kort..."):
             results = search_pokemon_cards(search_query)
             
         if results:
@@ -314,7 +327,7 @@ with tab2:
                     with col_info:
                         st.markdown(f"### {card_name}")
                         st.write(f"**Språk hittat:** `{def_lang}`")
-                        st.write(f"**Set:** {set_name} (`{set_code}`)")
+                        st.write(f"**Set / Kod:** {set_name} (`{set_code}`)")
                         st.write(f"**Setnr:** {full_number}")
                         if suggested_price:
                             st.caption(f"Estimerat marknadsvärde: ~{suggested_price} EUR")
