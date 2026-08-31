@@ -5,6 +5,7 @@ import base64
 import requests
 from datetime import date
 import urllib.parse
+import re
 
 # --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -82,7 +83,7 @@ def generate_cardmarket_url(card_name, set_name, set_nr, lang_code, cond_code):
     }
     return f"{base_search_url}?{urllib.parse.urlencode(params)}"
 
-# --- FULLSTÄNDIG FLERSPRÅKIG SÖKNING (ALLA OFFICIELLA SPRÅK) ---
+# --- SMART FLERSPRÅKIG & MULTI-FÄLT SÖKNING ---
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
     if not query:
@@ -93,24 +94,41 @@ def search_pokemon_cards(query):
     results = []
     seen_ids = set()
 
-    # Språkkoder som stöds av TCGdex API
+    # Rensa numret om användaren söker på t.ex. "016/050" -> "016" och "16"
+    clean_num = query.split("/")[0].strip()
+    stripped_num = clean_num.lstrip("0") if clean_num.isdigit() else clean_num
+
     LANG_CODES = {
-        "en": "ENG", "ja": "JPN", "fr": "FRA", "de": "GER", 
+        "ja": "JPN", "en": "ENG", "fr": "FRA", "de": "GER", 
         "es": "SPA", "it": "ITA", "pt": "POR", "ko": "KOR", "zh-tw": "ZHT"
     }
 
-    clean_num = query.split("/")[0].strip()
-
-    # 1. Sök i TCGdex API över alla språk
+    # 1. TCGdex API (Bred sökning på Namn, Set & Kortnummer)
     for lang_key, lang_code in LANG_CODES.items():
         try:
-            # Testa både sökning på namn och kort-ID/nummer
-            url_tcgdex = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(query)}"
+            # Hämta alla kort från språket
+            url_tcgdex = f"https://api.tcgdex.net/v2/{lang_key}/cards"
             res_dex = requests.get(url_tcgdex, headers=headers, timeout=3)
             
             if res_dex.status_code == 200:
-                dex_data = res_dex.json()
-                for item in dex_data[:5]: # Begränsa per språk för prestanda
+                cards_list = res_dex.json()
+                
+                # Filtrera lokalt på namn, localId (kortnr) eller set ID (t.ex. sm4a)
+                matched_cards = []
+                q_lower = query.lower()
+                
+                for item in cards_list:
+                    c_id = item.get("id", "").lower()
+                    c_name = item.get("name", "").lower()
+                    c_local = str(item.get("localId", "")).lower()
+                    
+                    # Matchningsvillkor
+                    if (q_lower in c_name) or (clean_num == c_local) or (stripped_num == c_local) or (q_lower in c_id):
+                        matched_cards.append(item)
+                        if len(matched_cards) >= 6:
+                            break
+
+                for item in matched_cards:
                     card_id = item.get("id", "")
                     unique_key = f"{card_id}_{lang_code}"
                     
@@ -135,11 +153,15 @@ def search_pokemon_cards(query):
                             })
         except Exception:
             pass
+            
+        if len(results) >= 12:
+            break
 
-    # 2. Fallback: Pokémon TCG API (Engelska/Västerländska)
+    # 2. Pokémon TCG API (Engelsk Reserv)
     if not results:
         try:
-            url = f"https://api.pokemontcg.io/v2/cards?q=name:\"{query}*\" OR number:\"{clean_num}\" OR set.id:\"{query.lower()}\""
+            q_str = f"name:\"{query}*\" OR number:\"{clean_num}\" OR number:\"{stripped_num}\" OR set.id:\"{query.lower()}\" OR set.ptcgoCode:\"{query.upper()}\""
+            url = f"https://api.pokemontcg.io/v2/cards?q={urllib.parse.quote(q_str)}"
             res = requests.get(url, headers=headers, timeout=5)
             if res.status_code == 200:
                 data = res.json().get("data", [])
@@ -256,16 +278,16 @@ with tab1:
 
 # --- FLIK 2: SÖK & LÄGG TILL ---
 with tab2:
-    st.subheader("🔍 Global Flerspråkig Sökning")
+    st.subheader("🔍 Sök på Namn, Nummer (t.ex. 016/050) eller Setkod (t.ex. sm4a)")
     
-    search_query = st.text_input("Skriv kortnamn, setnamn eller numrering (t.ex. 'Charizard', 'sm4a', '016/050' eller 'ライチュウ'):", key="card_search_input")
+    search_query = st.text_input("Skriv sökord:", key="card_search_input")
     
     if search_query:
-        with st.spinner("Söker globalt på svenska, engelska, japanska, tyska, franska m.fl..."):
+        with st.spinner("Söker och matchar kortnummer, setkoder och namn..."):
             results = search_pokemon_cards(search_query)
             
         if results:
-            st.success(f"Hittade {len(results)} träffar på alla språk. Välj ditt kort nedan:")
+            st.success(f"Hittade {len(results)} träffar:")
             
             for card_api in results:
                 with st.container():
@@ -346,7 +368,7 @@ with tab2:
                                 st.rerun()
                     st.divider()
         else:
-            st.warning("Ingen automatisk träff hittades på något språk. Du kan lägga till kortet manuellt nedan.")
+            st.warning("Ingen automatisk träff hittades. Du kan lägga till kortet manuellt nedan.")
 
     # --- FALLBACK: MANUELL INMATNING OM KORTET SAKNAS I API ---
     st.write("")
