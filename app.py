@@ -228,6 +228,7 @@ def show_card_dialog(selected_index, card_data):
                 
                 if img_url:
                     app_data["collection"][selected_index]["Bild"] = img_url
+                    app_data["collection"][selected_index]["Bild_Original"] = img_url
                     save_data_to_github(app_data)
                     
                     b64_str = f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
@@ -263,6 +264,9 @@ with tab1:
     if not collection_df.empty:
         if "Bild" not in collection_df.columns:
             collection_df.insert(0, "Bild", "")
+
+        if "Bild_Original" not in collection_df.columns:
+            collection_df["Bild_Original"] = collection_df["Bild"]
 
         def sanitize_img(val):
             if not val:
@@ -310,7 +314,7 @@ with tab1:
         }
         
         if edit_mode:
-            st.info("💡 **Tips:** Markera en rad och tryck på **Delete** för att radera den. Använd **Ctrl+Z** för att ångra ändringar. Klicka på 'Spara ändringar' när du är klar.")
+            st.info("💡 **Tips:** Markera en rad och tryck på **Delete** för att radera den. Klicka sedan på **'Spara alla ändringar'**.")
             
             editor_key = f"main_editor_v_{st.session_state['editor_version']}"
             
@@ -329,7 +333,7 @@ with tab1:
                 if st.button("💾 Spara alla ändringar", type="primary", use_container_width=True):
                     edited_records = edited_df.to_dict(orient="records")
                     
-                    # Sortera raderna efter Pärmnummer
+                    # Sortera kvarvarande rader efter Pärmnummer
                     def parse_parm(val):
                         try:
                             return int(val)
@@ -338,14 +342,24 @@ with tab1:
 
                     edited_records.sort(key=lambda x: parse_parm(x.get("Pärmnummer", 0)))
                     
-                    # Bygg ny samling och numrera om 1, 2, 3... automatiskt
+                    # Bygg ny samling och numrera om 1, 2, 3... automatiskt utan att återställa raderade kort
                     new_collection = []
                     for idx, record in enumerate(edited_records, start=1):
                         record["Pärmnummer"] = int(idx)
                         
-                        # Bevara bild-länkarna
-                        if not record.get("Bild") and (idx - 1) < len(app_data["collection"]):
-                            record["Bild"] = app_data["collection"][idx - 1].get("Bild", "")
+                        # Använd den ursprungliga bild-URL:en om 'Bild' ändrats till base64 eller tömts i editor
+                        orig_img = record.get("Bild_Original", "")
+                        if not orig_img:
+                            orig_img = record.get("Bild", "")
+                        
+                        record["Bild"] = orig_img
+                        record["Bild_Original"] = orig_img
+                        
+                        # Beräkna om SEK-värden
+                        eur_kopt = float(record.get("Köpt för (EUR)", 0.0) or 0.0)
+                        eur_varde = float(record.get("Värde (EUR)", 0.0) or 0.0)
+                        record["Köpt för (SEK)"] = round(eur_kopt * current_rate, 2)
+                        record["Värde idag (SEK)"] = round(eur_varde * current_rate, 2)
 
                         new_collection.append(record)
                     
@@ -353,7 +367,7 @@ with tab1:
                     save_data_to_github(app_data)
                     
                     st.session_state["editor_version"] += 1
-                    st.success("Samlingen sparades och alla nummer justerades!")
+                    st.success("Ändringarna sparades och raderna numrerades om!")
                     st.rerun()
 
             max_rows = len(edited_df)
@@ -493,6 +507,7 @@ with tab2:
 
         new_card = {
             "Bild": img_url,
+            "Bild_Original": img_url,
             "Pärmnummer": target_parm,
             "Språk": sprak,
             "Namn": namn,
