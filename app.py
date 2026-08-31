@@ -176,17 +176,8 @@ def normalize_max_nr(val):
     s = str(val).strip().lstrip('0')
     return s if s else "0"
 
-def renumber_collection(collection_list):
-    def parse_parm(val):
-        try:
-            return int(val)
-        except (ValueError, TypeError):
-            return 0
-
-    sorted_list = sorted(collection_list, key=lambda x: parse_parm(x.get("Pärmnummer", 0)))
-    for idx, card in enumerate(sorted_list, start=1):
-        card["Pärmnummer"] = idx
-    return sorted_list
+if "editor_version" not in st.session_state:
+    st.session_state["editor_version"] = 0
 
 app_data = load_data_from_github()
 if not app_data:
@@ -237,10 +228,13 @@ def show_card_dialog(selected_index, card_data):
                 
                 if img_url:
                     app_data["collection"][selected_index]["Bild"] = img_url
+                    app_data["collection"][selected_index]["Bild_Original"] = img_url
                     save_data_to_github(app_data)
                     
                     b64_str = f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
                     st.session_state["temp_image_cache"][img_url] = b64_str
+                    
+                    st.session_state["editor_version"] += 1
                     
                     if rot_key in st.session_state:
                         del st.session_state[rot_key]
@@ -263,14 +257,16 @@ tab1, tab2, tab3 = st.tabs(["📊 Samling", "➕ Lägg till nytt kort", "⚙️ 
 # --- FLIK 1: HUVUDSAMLING ---
 with tab1:
     st.subheader("Min Samling")
+    edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
     
-    # Säkerställ att samlingen alltid har korrekta pärmnummer (1, 2, 3...)
-    app_data["collection"] = renumber_collection(app_data.get("collection", []))
-    collection_df = pd.DataFrame(app_data["collection"])
+    collection_df = pd.DataFrame(app_data.get("collection", []))
     
     if not collection_df.empty:
         if "Bild" not in collection_df.columns:
             collection_df.insert(0, "Bild", "")
+
+        if "Bild_Original" not in collection_df.columns:
+            collection_df["Bild_Original"] = collection_df["Bild"]
 
         def sanitize_img(val):
             if not val:
@@ -316,52 +312,95 @@ with tab1:
             "Datum tillagd": st.column_config.TextColumn("Datum", width="small"),
             "Värde idag (SEK)": st.column_config.NumberColumn("Värde idag (SEK)", width="medium", disabled=True, format="%.2f"),
         }
-
-        # --- HANTERINGSPANEL FÖR RADER (STABIL & DIREKT) ---
-        with st.expander("🛠️ Hantera / Radera / Ändra kort", expanded=True):
-            col_sel, col_act1, col_act2 = st.columns([2, 1, 1])
+        
+        if edit_mode:
+            st.info("💡 **Tips:** Markera en rad och tryck på **Delete** för att radera den. Klicka sedan på **'Spara alla ändringar'**.")
             
-            total_cards = len(app_data["collection"])
-            with col_sel:
-                selected_parm = st.number_input(
-                    "Välj Pärmnummer att hantera:",
-                    min_value=1,
-                    max_value=max(1, total_cards),
-                    value=1,
-                    step=1
+            editor_key = f"main_editor_v_{st.session_state['editor_version']}"
+            
+            edited_df = st.data_editor(
+                df_display,
+                column_order=columns_order,
+                column_config=column_config,
+                num_rows="dynamic",
+                use_container_width=True,
+                key=editor_key
+            )
+            
+            col_save, col_img_select, col_img_btn = st.columns([2, 1, 1])
+            
+            with col_save:
+                if st.button("💾 Spara alla ändringar", type="primary", use_container_width=True):
+                    edited_records = edited_df.to_dict(orient="records")
+                    
+                    # Sortera kvarvarande rader efter Pärmnummer
+                    def parse_parm(val):
+                        try:
+                            return int(val)
+                        except (ValueError, TypeError):
+                            return 0
+
+                    edited_records.sort(key=lambda x: parse_parm(x.get("Pärmnummer", 0)))
+                    
+                    # Bygg ny samling och numrera om 1, 2, 3... automatiskt utan att återställa raderade kort
+                    new_collection = []
+                    for idx, record in enumerate(edited_records, start=1):
+                        record["Pärmnummer"] = int(idx)
+                        
+                        # Använd den ursprungliga bild-URL:en om 'Bild' ändrats till base64 eller tömts i editor
+                        orig_img = record.get("Bild_Original", "")
+                        if not orig_img:
+                            orig_img = record.get("Bild", "")
+                        
+                        record["Bild"] = orig_img
+                        record["Bild_Original"] = orig_img
+                        
+                        # Beräkna om SEK-värden
+                        eur_kopt = float(record.get("Köpt för (EUR)", 0.0) or 0.0)
+                        eur_varde = float(record.get("Värde (EUR)", 0.0) or 0.0)
+                        record["Köpt för (SEK)"] = round(eur_kopt * current_rate, 2)
+                        record["Värde idag (SEK)"] = round(eur_varde * current_rate, 2)
+
+                        new_collection.append(record)
+                    
+                    app_data["collection"] = new_collection
+                    save_data_to_github(app_data)
+                    
+                    st.session_state["editor_version"] += 1
+                    st.success("Ändringarna sparades och raderna numrerades om!")
+                    st.rerun()
+
+            max_rows = len(edited_df)
+            with col_img_select:
+                selected_row_num = st.number_input(
+                    "Rad för bild:", 
+                    min_value=1, 
+                    max_value=max(1, max_rows), 
+                    value=1, 
+                    step=1,
+                    label_visibility="collapsed"
                 )
-            
-            selected_idx = selected_parm - 1
-            
-            with col_act1:
-                st.write("") # Mellanrum för alignment
-                if st.button("🗑️ Radera valt kort", type="primary", use_container_width=True):
-                    if 0 <= selected_idx < len(app_data["collection"]):
-                        removed_card = app_data["collection"].pop(selected_idx)
-                        app_data["collection"] = renumber_collection(app_data["collection"])
-                        save_data_to_github(app_data)
-                        st.success(f"Radera kort #{selected_parm} ({removed_card.get('Namn', '')}) och numrerade om samlingen!")
-                        st.rerun()
+                selected_row_idx = selected_row_num - 1
 
-            with col_act2:
-                st.write("")
-                if st.button("🖼️ Byt bild på valt kort", use_container_width=True):
-                    st.session_state["open_dialog_index"] = selected_idx
+            with col_img_btn:
+                if st.button("🖼️ Byt bild", use_container_width=True):
+                    if max_rows > 0:
+                        st.session_state["open_dialog_index"] = selected_row_idx
 
-        # Visning av dialog om knappen tryckts
-        if "open_dialog_index" in st.session_state:
-            dlg_idx = st.session_state["open_dialog_index"]
-            if 0 <= dlg_idx < len(app_data["collection"]):
-                real_card_data = app_data["collection"][dlg_idx]
-                show_card_dialog(dlg_idx, real_card_data)
+            if "open_dialog_index" in st.session_state:
+                dlg_idx = st.session_state["open_dialog_index"]
+                if dlg_idx < len(app_data["collection"]):
+                    real_card_data = app_data["collection"][dlg_idx]
+                    show_card_dialog(dlg_idx, real_card_data)
 
-        st.dataframe(
-            df_display,
-            column_order=columns_order,
-            column_config=column_config,
-            use_container_width=True,
-            hide_index=True
-        )
+        else:
+            st.dataframe(
+                df_display,
+                column_order=columns_order,
+                column_config=column_config,
+                use_container_width=True,
+                hide_index=True
+            )
 
         total_value_sek = df_display["Värde idag (SEK)"].sum()
         total_cost_sek = df_display["Köpt för (SEK)"].sum()
@@ -468,6 +507,7 @@ with tab2:
 
         new_card = {
             "Bild": img_url,
+            "Bild_Original": img_url,
             "Pärmnummer": target_parm,
             "Språk": sprak,
             "Namn": namn,
@@ -484,10 +524,10 @@ with tab2:
         }
         
         app_data["collection"].append(new_card)
-        app_data["collection"] = renumber_collection(app_data["collection"])
         save_data_to_github(app_data)
         
         st.session_state["new_card_rotation"] = 0
+        st.session_state["editor_version"] += 1
 
         st.success(f"Kortet {namn} skapades på pärmnummer {target_parm}!")
         st.rerun()
