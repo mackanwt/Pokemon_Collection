@@ -278,6 +278,11 @@ with tab1:
         df_display["Köpt för (SEK)"] = pd.to_numeric(df_display["Köpt för (SEK)"], errors='coerce').fillna(0.0)
         df_display["Värde idag (SEK)"] = (df_display["Värde (EUR)"] * current_rate).round(2)
         
+        # Sortera samlingen efter pärmnummer
+        if "Pärmnummer" in df_display.columns:
+            df_display["Pärmnummer"] = pd.to_numeric(df_display["Pärmnummer"], errors='coerce').fillna(0).astype(int)
+            df_display = df_display.sort_values(by="Pärmnummer", ascending=True)
+
         columns_order = [
             "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
             "Övrigt", "Skick", "Köpt för (EUR)", "Köpt för (SEK)", 
@@ -451,64 +456,89 @@ with tab3:
             preview_new = pil_img_new.rotate(-cur_rot, expand=True) if cur_rot != 0 else pil_img_new
             st.image(preview_new, caption=f"Förhandsvisning (Rotation: {cur_rot}°)")
 
-    with st.form("add_new_card_form"):
-        col_a, col_b, col_c = st.columns(3)
-        with col_a:
-            parm = st.number_input("Pärmnummer", min_value=1, step=1)
-            sprak = st.selectbox("Språk", app_data.get("languages", ["ENG"]))
-            namn = st.selectbox("Namn", app_data.get("names", ["Pikachu"]))
-            skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"])
-            
-        with col_b:
-            setnr = st.text_input("Setnr. (t.ex. 12/111)", value="12/111")
-            max_nr = setnr.split("/")[-1].strip() if "/" in setnr else ""
-            sets_list = app_data.get("sets_list", [])
-            matching = [s for s in sets_list if str(s.get("Maxnr")).strip() == max_nr] or sets_list
-            selected_setbet = st.selectbox("SetBet.", [s["SetBet"] for s in matching] if matching else [""])
-            auto_set_name = next((s.get("Set") for s in sets_list if s.get("SetBet") == selected_setbet), "")
-            st.text_input("Set (Automatiskt)", value=auto_set_name, disabled=True)
-
-        with col_c:
-            ovrigt = st.selectbox("Övrigt", app_data.get("extra_options", ["Normal"]))
-            kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, step=0.5, format="%.2f")
-            varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
+    col_a, col_b, col_c = st.columns(3)
+    
+    with col_a:
+        parm = st.number_input("Pärmnummer", min_value=1, step=1)
+        sprak = st.selectbox("Språk", app_data.get("languages", ["ENG"]))
+        namn = st.selectbox("Namn", app_data.get("names", ["Pikachu"]))
+        skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"])
         
-        if st.form_submit_button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
-            img_url = ""
-            if new_uploaded_file:
-                pil_img_new = get_pil_from_uploaded_file(new_uploaded_file)
-                if pil_img_new:
-                    img_bytes = process_pil_image_to_bytes(pil_img_new, rotate_degrees=st.session_state.get("new_card_rotation", 0))
-                    img_url = upload_image_to_github(img_bytes)
-                    if img_url:
-                        b64_str = f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
-                        st.session_state["temp_image_cache"][img_url] = b64_str
-            
-            new_card = {
-                "Bild": img_url,
-                "Pärmnummer": parm,
-                "Språk": sprak,
-                "Namn": namn,
-                "Setnr.": setnr,
-                "SetBet.": selected_setbet,
-                "Set": auto_set_name,
-                "Övrigt": ovrigt,
-                "Skick": skick,
-                "Köpt för (EUR)": kopt_eur,
-                "Köpt för (SEK)": round(kopt_eur * current_rate, 2),
-                "Värde (EUR)": varde_eur,
-                "Värde idag (SEK)": round(varde_eur * current_rate, 2),
-                "Datum tillagd": date.today().strftime("%Y-%m-%d")
-            }
-            
-            app_data["collection"].append(new_card)
-            save_data_to_github(app_data)
-            
-            st.session_state["new_card_rotation"] = 0
-            st.session_state["editor_version"] += 1
+    with col_b:
+        setnr = st.text_input("Setnr. (t.ex. 12/111)", value="12/111")
+        
+        # --- FILTRERING AV SET BASERAT PÅ SLUTNUMMER ---
+        sets_list = app_data.get("sets_list", [])
+        max_nr = setnr.split("/")[-1].strip() if "/" in setnr else ""
+        
+        matching = []
+        if max_nr:
+            matching = [s for s in sets_list if str(s.get("Maxnr", "")).strip() == max_nr]
+        
+        # Om inga set matchade slutnumret eller om inget slutnummer angivits, visa ALLA set
+        available_sets = matching if matching else sets_list
+        setbet_options = [s["SetBet"] for s in available_sets if "SetBet" in s]
+        
+        if not setbet_options:
+            setbet_options = [""]
 
-            st.success(f"Kortet {namn} skapades och sparades!")
-            st.rerun()
+        selected_setbet = st.selectbox("SetBet.", setbet_options)
+        auto_set_name = next((s.get("Set") for s in sets_list if s.get("SetBet") == selected_setbet), "")
+        st.text_input("Set (Automatiskt)", value=auto_set_name, disabled=True)
+
+    with col_c:
+        ovrigt = st.selectbox("Övrigt", app_data.get("extra_options", ["Normal"]))
+        kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, step=0.5, format="%.2f")
+        varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
+    
+    if st.button("⚡ Spara nytt kort i samlingen", type="primary", use_container_width=True):
+        img_url = ""
+        if new_uploaded_file:
+            pil_img_new = get_pil_from_uploaded_file(new_uploaded_file)
+            if pil_img_new:
+                img_bytes = process_pil_image_to_bytes(pil_img_new, rotate_degrees=st.session_state.get("new_card_rotation", 0))
+                img_url = upload_image_to_github(img_bytes)
+                if img_url:
+                    b64_str = f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
+                    st.session_state["temp_image_cache"][img_url] = b64_str
+        
+        # --- AUTOMATISK FÖRSKJUTNING AV PÄRMNUMMER ---
+        target_parm = int(parm)
+        for card in app_data["collection"]:
+            curr_parm = card.get("Pärmnummer")
+            if curr_parm is not None:
+                try:
+                    curr_parm = int(curr_parm)
+                    if curr_parm >= target_parm:
+                        card["Pärmnummer"] = curr_parm + 1
+                except ValueError:
+                    pass
+
+        new_card = {
+            "Bild": img_url,
+            "Pärmnummer": target_parm,
+            "Språk": sprak,
+            "Namn": namn,
+            "Setnr.": setnr,
+            "SetBet.": selected_setbet,
+            "Set": auto_set_name,
+            "Övrigt": ovrigt,
+            "Skick": skick,
+            "Köpt för (EUR)": kopt_eur,
+            "Köpt för (SEK)": round(kopt_eur * current_rate, 2),
+            "Värde (EUR)": varde_eur,
+            "Värde idag (SEK)": round(varde_eur * current_rate, 2),
+            "Datum tillagd": date.today().strftime("%Y-%m-%d")
+        }
+        
+        app_data["collection"].append(new_card)
+        save_data_to_github(app_data)
+        
+        st.session_state["new_card_rotation"] = 0
+        st.session_state["editor_version"] += 1
+
+        st.success(f"Kortet {namn} skapades och sparades! Pärmnumren justerades automatiskt.")
+        st.rerun()
 
 # --- FLIK 4: HANTERA INSTÄLLNINGAR (SET, NAMN, SPRÅK, ETC) ---
 with tab4:
