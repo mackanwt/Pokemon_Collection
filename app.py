@@ -92,7 +92,6 @@ def process_pil_image_to_bytes(img, rotate_degrees=0):
         return None
 
 def upload_image_to_github(img_bytes):
-    """Laddar upp bilden till GitHub och returnerar public URL."""
     if not GITHUB_TOKEN or not GITHUB_REPO or not img_bytes:
         return ""
     
@@ -188,7 +187,7 @@ if not app_data:
 
 current_rate = 11.5
 
-# --- DIALOGRUTA FÖR BILDER MED ROTERING & SPARA-KNAPP ---
+# --- DIALOGRUTA FÖR BILDER MED ROTERING ---
 @st.dialog("🎴 Kortdetaljer & Välj bild")
 def show_card_dialog(selected_index, card_data):
     st.markdown(f"### {card_data.get('Namn', '')}")
@@ -224,11 +223,9 @@ def show_card_dialog(selected_index, card_data):
                 img_url = upload_image_to_github(img_bytes)
                 
                 if img_url:
-                    # Spara GitHub URL i data.json
                     app_data["collection"][selected_index]["Bild"] = img_url
                     save_data_to_github(app_data)
                     
-                    # Spara tillfällig Base64 i sessionen så att den syns direkt i tabellen innan GitHub CDN vaknar
                     b64_str = f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
                     st.session_state["temp_image_cache"][img_url] = b64_str
                     
@@ -250,7 +247,7 @@ def show_card_dialog(selected_index, card_data):
             st.info("Ingen bild finns sparad för detta kort ännu.")
 
 # --- HUVUDLAYOUT ---
-tab1, tab2, tab3 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort", "⚙️ Hantera inställningar"])
 
 # --- FLIK 1: HUVUDSAMLING ---
 with tab1:
@@ -267,7 +264,6 @@ with tab1:
             if not val:
                 return ""
             s_val = str(val).strip()
-            # Om bilden är ny och finns i sessionens snabb-cache, använd den direkt
             if s_val in st.session_state["temp_image_cache"]:
                 return st.session_state["temp_image_cache"][s_val]
             if s_val.startswith("http://") or s_val.startswith("https://") or s_val.startswith("data:image"):
@@ -459,20 +455,21 @@ with tab3:
         col_a, col_b, col_c = st.columns(3)
         with col_a:
             parm = st.number_input("Pärmnummer", min_value=1, step=1)
-            sprak = st.selectbox("Språk", app_data["languages"])
-            namn = st.selectbox("Namn", app_data["names"])
+            sprak = st.selectbox("Språk", app_data.get("languages", ["ENG"]))
+            namn = st.selectbox("Namn", app_data.get("names", ["Pikachu"]))
             skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"])
             
         with col_b:
             setnr = st.text_input("Setnr. (t.ex. 12/111)", value="12/111")
             max_nr = setnr.split("/")[-1].strip() if "/" in setnr else ""
-            matching = [s for s in app_data["sets_list"] if str(s.get("Maxnr")).strip() == max_nr] or app_data["sets_list"]
-            selected_setbet = st.selectbox("SetBet.", [s["SetBet"] for s in matching])
-            auto_set_name = next((s.get("Set") for s in app_data["sets_list"] if s.get("SetBet") == selected_setbet), "")
+            sets_list = app_data.get("sets_list", [])
+            matching = [s for s in sets_list if str(s.get("Maxnr")).strip() == max_nr] or sets_list
+            selected_setbet = st.selectbox("SetBet.", [s["SetBet"] for s in matching] if matching else [""])
+            auto_set_name = next((s.get("Set") for s in sets_list if s.get("SetBet") == selected_setbet), "")
             st.text_input("Set (Automatiskt)", value=auto_set_name, disabled=True)
 
         with col_c:
-            ovrigt = st.selectbox("Övrigt", app_data["extra_options"])
+            ovrigt = st.selectbox("Övrigt", app_data.get("extra_options", ["Normal"]))
             kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, step=0.5, format="%.2f")
             varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
         
@@ -512,3 +509,79 @@ with tab3:
 
             st.success(f"Kortet {namn} skapades och sparades!")
             st.rerun()
+
+# --- FLIK 4: HANTERA INSTÄLLNINGAR (SET, NAMN, SPRÅK, ETC) ---
+with tab4:
+    st.subheader("⚙️ Hantera val och alternativ")
+    
+    col_set, col_other = st.columns(2)
+    
+    with col_set:
+        st.markdown("### 🎴 Lägg till nytt Set & SetBet")
+        with st.form("add_new_set_form"):
+            new_setbet = st.text_input("SetBet (Förkortning, t.ex. CIN, BS, EVO)")
+            new_set_name = st.text_input("Fullständigt Setnamn (t.ex. Crimson Invasion (CIN))")
+            new_set_maxnr = st.text_input("Max-nummer i setet (t.ex. 111)")
+            
+            if st.form_submit_button("➕ Spara nytt Set", type="primary", use_container_width=True):
+                if new_setbet and new_set_name:
+                    new_entry = {
+                        "SetBet": new_setbet.strip(),
+                        "Set": new_set_name.strip(),
+                        "Maxnr": new_set_maxnr.strip()
+                    }
+                    if "sets_list" not in app_data:
+                        app_data["sets_list"] = []
+                    
+                    app_data["sets_list"].append(new_entry)
+                    save_data_to_github(app_data)
+                    st.success(f"Setet '{new_set_name}' har lagts till!")
+                    st.rerun()
+                else:
+                    st.warning("Fyll i både SetBet och Setnamn.")
+
+    with col_other:
+        st.markdown("### 📝 Lägg till nytt Kortnamn")
+        with st.form("add_new_name_form"):
+            new_card_name = st.text_input("Kortnamn (t.ex. Rayquaza GX)")
+            if st.form_submit_button("➕ Spara nytt Namn", use_container_width=True):
+                if new_card_name:
+                    if "names" not in app_data:
+                        app_data["names"] = []
+                    if new_card_name.strip() not in app_data["names"]:
+                        app_data["names"].append(new_card_name.strip())
+                        app_data["names"].sort()
+                        save_data_to_github(app_data)
+                        st.success(f"Namnet '{new_card_name}' lades till!")
+                        st.rerun()
+
+    st.divider()
+    
+    col_lang, col_opt = st.columns(2)
+    with col_lang:
+        st.markdown("### 🌐 Lägg till Språk")
+        with st.form("add_new_lang_form"):
+            new_lang = st.text_input("Språk (t.ex. KOR, GER)")
+            if st.form_submit_button("➕ Spara Språk", use_container_width=True):
+                if new_lang:
+                    if "languages" not in app_data:
+                        app_data["languages"] = []
+                    if new_lang.strip() not in app_data["languages"]:
+                        app_data["languages"].append(new_lang.strip())
+                        save_data_to_github(app_data)
+                        st.success(f"Språket '{new_lang}' lades till!")
+                        st.rerun()
+
+    with col_opt:
+        st.markdown("### ✨ Lägg till alternativ under Övrigt")
+        with st.form("add_new_opt_form"):
+            new_opt = st.text_input("Övrigt-alternativ (t.ex. Promo, Full Art)")
+            if st.form_submit_button("➕ Spara Övrigt-kategori", use_container_width=True):
+                if new_opt:
+                    if "extra_options" not in app_data:
+                        app_data["extra_options"] = []
+                    if new_opt.strip() not in app_data["extra_options"]:
+                        app_data["extra_options"].append(new_opt.strip())
+                        save_data_to_github(app_data)
+                        st.success(f"Kategorin '{new_opt}' lades till!")
+                        st.rerun()
