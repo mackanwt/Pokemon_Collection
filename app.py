@@ -172,8 +172,8 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
-def clean_num_str(val):
-    """Tar bort inledande nollor och mellanslag för säker jämförelse (t.ex. '050' -> '50')"""
+def normalize_max_nr(val):
+    """Tar bort inledande nollor och mellanslag t.ex. '050' blir '50'"""
     s = str(val).strip().lstrip('0')
     return s if s else "0"
 
@@ -464,38 +464,44 @@ with tab3:
     
     with col_a:
         parm = st.number_input("Pärmnummer", min_value=1, step=1)
-        sprak = st.selectbox("Språk", app_data.get("languages", ["ENG"]))
-        namn = st.selectbox("Namn", app_data.get("names", ["Pikachu"]))
+        sprak = st.selectbox("Språk", sorted(app_data.get("languages", ["ENG"])))
+        namn = st.selectbox("Namn", sorted(app_data.get("names", ["Pikachu"])))
         skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"])
         
     with col_b:
         setnr = st.text_input("Setnr. (t.ex. 12/111)", value="016/050", key="input_setnr")
         
-        # --- DYNAMISK FILTRERING (Smart hantering av inledande nollor) ---
+        # --- PRECIS DYNAMISK FILTRERING OCH BOKSTAVSSORTERING ---
         sets_list = app_data.get("sets_list", [])
         
-        raw_max = setnr.split("/")[-1] if "/" in setnr else ""
-        cleaned_search_max = clean_num_str(raw_max) if raw_max else ""
-        
-        matching = []
-        if cleaned_search_max:
-            for s in sets_list:
-                s_max = clean_num_str(s.get("Maxnr", ""))
-                if s_max == cleaned_search_max:
-                    matching.append(s)
-        
-        available_sets = matching if matching else sets_list
-        setbet_options = [s.get("SetBet", "") for s in available_sets if s.get("SetBet")]
-        
+        setbet_options = []
+        if "/" in setnr:
+            search_max = setnr.split("/")[-1].strip()
+            norm_search_max = normalize_max_nr(search_max)
+            
+            # Sök efter alla set vars Maxnr matchar (t.ex. 050 -> 50)
+            filtered_sets = [
+                s.get("SetBet", "") for s in sets_list 
+                if normalize_max_nr(s.get("Maxnr", "")) == norm_search_max and s.get("SetBet")
+            ]
+            setbet_options = filtered_sets
+
+        # Om inget / skrevs in eller om ingen matchning hittades, visa hela listan
+        if not setbet_options:
+            setbet_options = [s.get("SetBet", "") for s in sets_list if s.get("SetBet")]
+
+        # Sortera alltid listan i bokstavsordning (A–Ö)
+        setbet_options = sorted(list(set(setbet_options)))
+
         if not setbet_options:
             setbet_options = [""]
 
-        selected_setbet = st.selectbox("SetBet.", setbet_options)
+        selected_setbet = st.selectbox("SetBet.", setbet_options, key="select_setbet")
         auto_set_name = next((s.get("Set", "") for s in sets_list if s.get("SetBet") == selected_setbet), "")
         st.text_input("Set (Automatiskt)", value=auto_set_name, disabled=True)
 
     with col_c:
-        ovrigt = st.selectbox("Övrigt", app_data.get("extra_options", ["Normal"]))
+        ovrigt = st.selectbox("Övrigt", sorted(app_data.get("extra_options", ["Normal"])))
         kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, step=0.5, format="%.2f")
         varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f")
     
