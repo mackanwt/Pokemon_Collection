@@ -575,6 +575,22 @@
       "Datum tillagd": "2026-08-21",
       "Värde idag (SEK)": 34.5,
       "Bild": ""
+    },
+    {
+      "Bild": "",
+      "Pärmnummer": 8,
+      "Språk": "JPN",
+      "Namn": "Alolan Raichu",
+      "Setnr.": "016/050",
+      "SetBet.": "CIN",
+      "Set": "Crimson Invasion",
+      "Övrigt": "Reverse Holo",
+      "Skick": "NM",
+      "Köpt för (EUR)": 3.33,
+      "Köpt för (SEK)": 38.3,
+      "Värde (EUR)": 0.0,
+      "Värde idag (SEK)": 0.0,
+      "Datum tillagd": "2026-08-31"
     }
   ],
   "sets_list": [
@@ -662,11 +678,6 @@
       "Maxnr": "193",
       "SetBet": "m2a",
       "Set": "MEGA Dream ex (m2a)"
-    },
-    {
-      "SetBet": "sm4a",
-      "Set": "Ultradimensional Beasts",
-      "Maxnr": "050"
     }
   ],
   "languages": [
