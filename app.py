@@ -353,15 +353,37 @@ with tab1:
             st.divider()
             if st.button("💾 Spara alla ändringar i samlingen", type="primary", use_container_width=True):
                 edited_records = edited_df.to_dict(orient="records")
-                for idx, record in enumerate(edited_records):
-                    if idx < len(app_data["collection"]):
-                        if not record.get("Bild"):
-                            record["Bild"] = app_data["collection"][idx].get("Bild", "")
-                app_data["collection"] = edited_records
+                
+                # 1. Sortera raderna efter befintligt Pärmnummer
+                def parse_parm(val):
+                    try:
+                        return int(val)
+                    except (ValueError, TypeError):
+                        return 0
+
+                edited_records.sort(key=lambda x: parse_parm(x.get("Pärmnummer", 0)))
+                
+                # 2. Om rader raderades sänks alla efterföljande kort med ett heltal (1, 2, 3...)
+                new_collection = []
+                for idx, record in enumerate(edited_records, start=1):
+                    record["Pärmnummer"] = int(idx)
+                    
+                    if not record.get("Bild") and (idx - 1) < len(app_data["collection"]):
+                        record["Bild"] = app_data["collection"][idx - 1].get("Bild", "")
+
+                    if str(record.get("Bild")).startswith("data:image"):
+                        for orig_item in app_data["collection"]:
+                            if orig_item.get("Namn") == record.get("Namn") and orig_item.get("Setnr.") == record.get("Setnr."):
+                                record["Bild"] = orig_item.get("Bild", "")
+                                break
+
+                    new_collection.append(record)
+                
+                app_data["collection"] = new_collection
                 save_data_to_github(app_data)
                 
                 st.session_state["editor_version"] += 1
-                st.success("Samlingen sparades!")
+                st.success("Samlingen sparades och pärmnumren justerades!")
                 st.rerun()
         else:
             st.dataframe(
@@ -514,15 +536,17 @@ with tab3:
         
         target_parm = int(parm)
         
-        # --- SÄKER FÖRSKJUTNING AV PÄRMNUMMER ---
-        # 1. Knuffa ner alla befintliga kort först (säkra konvertering till int)
+        # --- ÖKA BEFINTLIGA NUMMER MED 1 OM DE ÄR >= TARGET_PARM ---
         for card in app_data["collection"]:
             curr_val = card.get("Pärmnummer")
-            if curr_val is not None and str(curr_val).isdigit():
-                if int(curr_val) >= target_parm:
-                    card["Pärmnummer"] = int(curr_val) + 1
+            if curr_val is not None:
+                try:
+                    c_num = int(curr_val)
+                    if c_num >= target_parm:
+                        card["Pärmnummer"] = c_num + 1
+                except (ValueError, TypeError):
+                    pass
 
-        # 2. Skapa och lägg till det nya kortet EFTER att förskjutningen är klar
         new_card = {
             "Bild": img_url,
             "Pärmnummer": target_parm,
@@ -546,7 +570,7 @@ with tab3:
         st.session_state["new_card_rotation"] = 0
         st.session_state["editor_version"] += 1
 
-        st.success(f"Kortet {namn} skapades och sparades! Pärmnumren justerades automatiskt.")
+        st.success(f"Kortet {namn} skapades och sparades på pärmnummer {target_parm}! Alla efterföljande nummer knuffades upp 1 steg.")
         st.rerun()
 
 # --- FLIK 4: HANTERA INSTÄLLNINGAR (SET, NAMN, SPRÅK, ETC) ---
