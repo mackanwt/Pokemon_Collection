@@ -82,7 +82,7 @@ def generate_cardmarket_url(card_name, set_name, set_nr, lang_code, cond_code):
     }
     return f"{base_search_url}?{urllib.parse.urlencode(params)}"
 
-# --- API SÖKNING MED SÄKRAD UPPDATERAD FUNKTION ---
+# --- FULLSTÄNDIG FLERSPRÅKIG SÖKNING (ALLA OFFICIELLA SPRÅK) ---
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
     if not query:
@@ -90,53 +90,66 @@ def search_pokemon_cards(query):
     
     query = query.strip()
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-    
-    # 1. Försök med Pokémon TCG API
-    try:
-        if query.isdigit() or "/" in query:
-            clean_num = query.split("/")[0].lstrip("0")
-            url = f"https://api.pokemontcg.io/v2/cards?q=number:\"{clean_num}\" OR number:\"{query}\""
-        else:
-            url = f"https://api.pokemontcg.io/v2/cards?q=name:\"{query}*\""
+    results = []
+    seen_ids = set()
+
+    # Språkkoder som stöds av TCGdex API
+    LANG_CODES = {
+        "en": "ENG", "ja": "JPN", "fr": "FRA", "de": "GER", 
+        "es": "SPA", "it": "ITA", "pt": "POR", "ko": "KOR", "zh-tw": "ZHT"
+    }
+
+    clean_num = query.split("/")[0].strip()
+
+    # 1. Sök i TCGdex API över alla språk
+    for lang_key, lang_code in LANG_CODES.items():
+        try:
+            # Testa både sökning på namn och kort-ID/nummer
+            url_tcgdex = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(query)}"
+            res_dex = requests.get(url_tcgdex, headers=headers, timeout=3)
             
-        res = requests.get(url, headers=headers, timeout=6)
-        if res.status_code == 200:
-            data = res.json().get("data", [])
-            if data:
-                return data
-    except Exception:
-        pass
+            if res_dex.status_code == 200:
+                dex_data = res_dex.json()
+                for item in dex_data[:5]: # Begränsa per språk för prestanda
+                    card_id = item.get("id", "")
+                    unique_key = f"{card_id}_{lang_code}"
+                    
+                    if unique_key not in seen_ids:
+                        seen_ids.add(unique_key)
+                        c_res = requests.get(f"https://api.tcgdex.net/v2/{lang_key}/cards/{card_id}", headers=headers, timeout=2)
+                        if c_res.status_code == 200:
+                            c = c_res.json()
+                            set_id = c.get("set", {}).get("id", "").upper()
+                            results.append({
+                                "id": unique_key,
+                                "name": c.get("name"),
+                                "set": {
+                                    "name": c.get("set", {}).get("name", ""),
+                                    "ptcgoCode": set_id,
+                                    "printedTotal": c.get("set", {}).get("cardCount", {}).get("official", "")
+                                },
+                                "number": c.get("localId", ""),
+                                "images": {"small": f"{c.get('image')}/low.png" if c.get('image') else ""},
+                                "cardmarket": {"prices": {"averageSellPrice": 0.0}},
+                                "default_lang": lang_code
+                            })
+        except Exception:
+            pass
 
-    # 2. Fallback till TCGdex API om TCG.io inte gav träff eller gick trögt
-    try:
-        url_tcgdex = f"https://api.tcgdex.net/v2/en/cards?name={query}"
-        res_dex = requests.get(url_tcgdex, headers=headers, timeout=6)
-        if res_dex.status_code == 200:
-            dex_data = res_dex.json()
-            converted_results = []
-            for item in dex_data[:12]:
-                card_id = item.get("id", "")
-                card_res = requests.get(f"https://api.tcgdex.net/v2/en/cards/{card_id}", headers=headers, timeout=4)
-                if card_res.status_code == 200:
-                    c = card_res.json()
-                    converted_results.append({
-                        "id": c.get("id"),
-                        "name": c.get("name"),
-                        "set": {
-                            "name": c.get("set", {}).get("name", ""),
-                            "ptcgoCode": c.get("set", {}).get("id", "").upper(),
-                            "printedTotal": c.get("set", {}).get("cardCount", {}).get("official", "")
-                        },
-                        "number": c.get("localId", ""),
-                        "images": {"small": f"{c.get('image')}/low.png" if c.get('image') else ""},
-                        "cardmarket": {"prices": {"averageSellPrice": 0.0}}
-                    })
-            if converted_results:
-                return converted_results
-    except Exception:
-        pass
+    # 2. Fallback: Pokémon TCG API (Engelska/Västerländska)
+    if not results:
+        try:
+            url = f"https://api.pokemontcg.io/v2/cards?q=name:\"{query}*\" OR number:\"{clean_num}\" OR set.id:\"{query.lower()}\""
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                data = res.json().get("data", [])
+                for d in data[:10]:
+                    d["default_lang"] = "ENG"
+                    results.append(d)
+        except Exception:
+            pass
 
-    return []
+    return results
 
 # --- HÄMTA DATA ---
 app_data = load_data_from_github()
@@ -243,18 +256,18 @@ with tab1:
 
 # --- FLIK 2: SÖK & LÄGG TILL ---
 with tab2:
-    st.subheader("🔍 Sök i Pokémon-databasen")
+    st.subheader("🔍 Global Flerspråkig Sökning")
     
-    search_query = st.text_input("Skriv kortnamn eller setnummer (t.ex. 'Pikachu', 'Charizard' eller '16'):", key="card_search_input")
+    search_query = st.text_input("Skriv kortnamn, setnamn eller numrering (t.ex. 'Charizard', 'sm4a', '016/050' eller 'ライチュウ'):", key="card_search_input")
     
     if search_query:
-        with st.spinner("Söker i databasen..."):
+        with st.spinner("Söker globalt på svenska, engelska, japanska, tyska, franska m.fl..."):
             results = search_pokemon_cards(search_query)
             
         if results:
-            st.success(f"Hittade {len(results)} kort. Välj ditt kort nedan:")
+            st.success(f"Hittade {len(results)} träffar på alla språk. Välj ditt kort nedan:")
             
-            for card_api in results[:12]:
+            for card_api in results:
                 with st.container():
                     col_img, col_info, col_form = st.columns([1, 2, 2])
                     
@@ -267,6 +280,7 @@ with tab2:
                     full_number = f"{number}/{printed_total}" if printed_total else number
                     
                     img_url = card_api.get("images", {}).get("small", "")
+                    def_lang = card_api.get("default_lang", "ENG")
                     
                     cm_prices = card_api.get("cardmarket", {}).get("prices", {})
                     suggested_price = cm_prices.get("averageSellPrice", cm_prices.get("trendPrice", 0.0))
@@ -277,6 +291,7 @@ with tab2:
 
                     with col_info:
                         st.markdown(f"### {card_name}")
+                        st.write(f"**Språk hittat:** `{def_lang}`")
                         st.write(f"**Set:** {set_name} (`{set_code}`)")
                         st.write(f"**Setnr:** {full_number}")
                         if suggested_price:
@@ -285,8 +300,12 @@ with tab2:
                     with col_form:
                         with st.form(key=f"add_form_{card_api['id']}"):
                             c_a, c_b = st.columns(2)
+                            
+                            all_langs = ["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"]
+                            default_lang_idx = all_langs.index(def_lang) if def_lang in all_langs else 0
+                            
                             with c_a:
-                                lang = st.selectbox("Språk", ["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA"], index=0)
+                                lang = st.selectbox("Språk", all_langs, index=default_lang_idx)
                                 cond = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"], index=0)
                                 parm_nr = st.number_input("Pärmnummer", min_value=1, value=len(app_data.get("collection", [])) + 1)
                             with c_b:
@@ -327,4 +346,55 @@ with tab2:
                                 st.rerun()
                     st.divider()
         else:
-            st.warning("Hittade inga kort som matchade sökningen. Prova att söka på t.ex. 'Pikachu'.")
+            st.warning("Ingen automatisk träff hittades på något språk. Du kan lägga till kortet manuellt nedan.")
+
+    # --- FALLBACK: MANUELL INMATNING OM KORTET SAKNAS I API ---
+    st.write("")
+    with st.expander("✏️ Kan du inte hitta kortet? Lägg till manuellt", expanded=not search_query):
+        with st.form("manual_add_form"):
+            m_col1, m_col2, m_col3 = st.columns(3)
+            with m_col1:
+                m_name = st.text_input("Namn *", value="Alolan Raichu")
+                m_set = st.text_input("Set *", value="Ultradimensional Beasts")
+                m_setbet = st.text_input("SetBet *", value="SM4A")
+            with m_col2:
+                m_setnr = st.text_input("Setnr. *", value="016/050")
+                m_lang = st.selectbox("Språk", ["JPN", "ENG", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], index=0, key="m_lang")
+                m_cond = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"], index=0, key="m_cond")
+            with m_col3:
+                m_parm = st.number_input("Pärmnummer", min_value=1, value=len(app_data.get("collection", [])) + 1, key="m_parm")
+                m_ovrigt = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], index=0, key="m_ovr")
+                m_img = st.text_input("Bild URL (valfri)", value="")
+                m_kopt = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, key="m_kopt")
+                m_varde = st.number_input("Värde (EUR)", min_value=0.0, value=2.70, key="m_varde")
+
+            if st.form_submit_button("➕ Spara manuellt kort", type="primary", use_container_width=True):
+                cm_url = generate_cardmarket_url(m_name, m_set, m_setnr, m_lang, m_cond)
+                new_entry = {
+                    "Bild": m_img,
+                    "Pärmnummer": int(m_parm),
+                    "Språk": m_lang,
+                    "Namn": m_name,
+                    "Setnr.": m_setnr,
+                    "SetBet.": m_setbet,
+                    "Set": m_set,
+                    "Övrigt": m_ovrigt,
+                    "Skick": m_cond,
+                    "Köpt för (EUR)": m_kopt,
+                    "Köpt för (SEK)": round(m_kopt * current_rate, 2),
+                    "Värde (EUR)": m_varde,
+                    "Värde idag (SEK)": round(m_varde * current_rate, 2),
+                    "Datum tillagd": date.today().strftime("%Y-%m-%d"),
+                    "Cardmarket": cm_url
+                }
+                
+                for existing_card in app_data["collection"]:
+                    if int(existing_card.get("Pärmnummer", 0)) >= m_parm:
+                        existing_card["Pärmnummer"] = int(existing_card["Pärmnummer"]) + 1
+                        
+                app_data["collection"].append(new_entry)
+                app_data["collection"] = renumber_collection(app_data["collection"])
+                
+                save_data_to_github(app_data)
+                st.success(f"Lade till {m_name} (#{m_parm}) manuellt!")
+                st.rerun()
