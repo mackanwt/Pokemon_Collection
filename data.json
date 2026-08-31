@@ -1,3 +1,21 @@
 {
-  "collection": []
+  "collection": [
+    {
+      "Bild": "https://assets.tcgdex.net/ja/SM4A/016/high.png",
+      "Pärmnummer": 1,
+      "Språk": "JPN",
+      "Namn": "アローラライチュウ",
+      "Setnr.": "016",
+      "SetBet.": "SM4A",
+      "Set": "SM4A",
+      "Övrigt": "Holo",
+      "Skick": "NM",
+      "Köpt för (EUR)": 3.33,
+      "Köpt för (SEK)": 38.3,
+      "Värde (EUR)": 2.7,
+      "Värde idag (SEK)": 31.05,
+      "Datum tillagd": "2026-08-31",
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=SM4A+016&language=7&minCondition=2"
+    }
+  ]
 }
