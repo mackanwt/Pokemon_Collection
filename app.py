@@ -471,7 +471,6 @@ with tab3:
     with col_b:
         setnr = st.text_input("Setnr. (t.ex. 12/111)", value="016/050", key="input_setnr")
         
-        # --- PRECIS DYNAMISK FILTRERING OCH BOKSTAVSSORTERING ---
         sets_list = app_data.get("sets_list", [])
         
         setbet_options = []
@@ -479,18 +478,15 @@ with tab3:
             search_max = setnr.split("/")[-1].strip()
             norm_search_max = normalize_max_nr(search_max)
             
-            # Sök efter alla set vars Maxnr matchar (t.ex. 050 -> 50)
             filtered_sets = [
                 s.get("SetBet", "") for s in sets_list 
                 if normalize_max_nr(s.get("Maxnr", "")) == norm_search_max and s.get("SetBet")
             ]
             setbet_options = filtered_sets
 
-        # Om inget / skrevs in eller om ingen matchning hittades, visa hela listan
         if not setbet_options:
             setbet_options = [s.get("SetBet", "") for s in sets_list if s.get("SetBet")]
 
-        # Sortera alltid listan i bokstavsordning (A–Ö)
         setbet_options = sorted(list(set(setbet_options)))
 
         if not setbet_options:
@@ -516,18 +512,17 @@ with tab3:
                     b64_str = f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
                     st.session_state["temp_image_cache"][img_url] = b64_str
         
-        # --- AUTOMATISK FÖRSKJUTNING AV PÄRMNUMMER ---
         target_parm = int(parm)
+        
+        # --- SÄKER FÖRSKJUTNING AV PÄRMNUMMER ---
+        # 1. Knuffa ner alla befintliga kort först (säkra konvertering till int)
         for card in app_data["collection"]:
-            curr_parm = card.get("Pärmnummer")
-            if curr_parm is not None:
-                try:
-                    curr_parm = int(curr_parm)
-                    if curr_parm >= target_parm:
-                        card["Pärmnummer"] = curr_parm + 1
-                except ValueError:
-                    pass
+            curr_val = card.get("Pärmnummer")
+            if curr_val is not None and str(curr_val).isdigit():
+                if int(curr_val) >= target_parm:
+                    card["Pärmnummer"] = int(curr_val) + 1
 
+        # 2. Skapa och lägg till det nya kortet EFTER att förskjutningen är klar
         new_card = {
             "Bild": img_url,
             "Pärmnummer": target_parm,
