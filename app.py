@@ -172,6 +172,11 @@ def save_data_to_github(data_dict):
     put_res = requests.put(url, json=payload, headers=headers)
     return put_res.status_code in [200, 201]
 
+def clean_num_str(val):
+    """Tar bort inledande nollor och mellanslag för säker jämförelse (t.ex. '050' -> '50')"""
+    s = str(val).strip().lstrip('0')
+    return s if s else "0"
+
 if "editor_version" not in st.session_state:
     st.session_state["editor_version"] = 0
 
@@ -179,7 +184,7 @@ app_data = load_data_from_github()
 if not app_data:
     app_data = {
         "collection": [],
-        "languages": ["ENG", "JAP", "SWE"],
+        "languages": ["ENG", "JPN", "SWE"],
         "names": ["Alolan Raichu", "Pikachu", "Charizard"],
         "extra_options": ["Normal", "Holo", "Reverse Holo", "Secret Rare"],
         "sets_list": [{"SetBet": "CIN", "Set": "Crimson Invasion (CIN)", "Maxnr": "111"}]
@@ -278,7 +283,6 @@ with tab1:
         df_display["Köpt för (SEK)"] = pd.to_numeric(df_display["Köpt för (SEK)"], errors='coerce').fillna(0.0)
         df_display["Värde idag (SEK)"] = (df_display["Värde (EUR)"] * current_rate).round(2)
         
-        # Sortera samlingen efter pärmnummer
         if "Pärmnummer" in df_display.columns:
             df_display["Pärmnummer"] = pd.to_numeric(df_display["Pärmnummer"], errors='coerce').fillna(0).astype(int)
             df_display = df_display.sort_values(by="Pärmnummer", ascending=True)
@@ -465,25 +469,29 @@ with tab3:
         skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"])
         
     with col_b:
-        setnr = st.text_input("Setnr. (t.ex. 12/111)", value="12/111")
+        setnr = st.text_input("Setnr. (t.ex. 12/111)", value="016/050", key="input_setnr")
         
-        # --- FILTRERING AV SET BASERAT PÅ SLUTNUMMER ---
+        # --- DYNAMISK FILTRERING (Smart hantering av inledande nollor) ---
         sets_list = app_data.get("sets_list", [])
-        max_nr = setnr.split("/")[-1].strip() if "/" in setnr else ""
+        
+        raw_max = setnr.split("/")[-1] if "/" in setnr else ""
+        cleaned_search_max = clean_num_str(raw_max) if raw_max else ""
         
         matching = []
-        if max_nr:
-            matching = [s for s in sets_list if str(s.get("Maxnr", "")).strip() == max_nr]
+        if cleaned_search_max:
+            for s in sets_list:
+                s_max = clean_num_str(s.get("Maxnr", ""))
+                if s_max == cleaned_search_max:
+                    matching.append(s)
         
-        # Om inga set matchade slutnumret eller om inget slutnummer angivits, visa ALLA set
         available_sets = matching if matching else sets_list
-        setbet_options = [s["SetBet"] for s in available_sets if "SetBet" in s]
+        setbet_options = [s.get("SetBet", "") for s in available_sets if s.get("SetBet")]
         
         if not setbet_options:
             setbet_options = [""]
 
         selected_setbet = st.selectbox("SetBet.", setbet_options)
-        auto_set_name = next((s.get("Set") for s in sets_list if s.get("SetBet") == selected_setbet), "")
+        auto_set_name = next((s.get("Set", "") for s in sets_list if s.get("SetBet") == selected_setbet), "")
         st.text_input("Set (Automatiskt)", value=auto_set_name, disabled=True)
 
     with col_c:
