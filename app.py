@@ -252,12 +252,12 @@ def show_card_dialog(selected_index, card_data):
             st.info("Ingen bild finns sparad för detta kort ännu.")
 
 # --- HUVUDLAYOUT ---
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Samling", "✏️ Redigera samling", "➕ Lägg till nytt kort", "⚙️ Hantera inställningar"])
+tab1, tab2, tab3 = st.tabs(["📊 Samling", "➕ Lägg till nytt kort", "⚙️ Hantera inställningar"])
 
 # --- FLIK 1: HUVUDSAMLING ---
 with tab1:
     st.subheader("Min Samling")
-    edit_mode = st.toggle("✏️ Redigeringsläge", value=False)
+    edit_mode = st.toggle("✏️ Redigeringsläge (Slår igenom direkt, Ctrl+Z stöds)", value=False)
     
     collection_df = pd.DataFrame(app_data.get("collection", []))
     
@@ -313,6 +313,7 @@ with tab1:
         if edit_mode:
             editor_key = f"main_editor_v_{st.session_state['editor_version']}"
             
+            # num_rows="dynamic" gör att du kan klicka på raden och trycka 'Delete' / 'Backspace' för att radera rader
             edited_df = st.data_editor(
                 df_display,
                 column_order=columns_order,
@@ -322,6 +323,42 @@ with tab1:
                 key=editor_key
             )
             
+            # --- AUTOMATISK SYNKNING NÄR TABELLEN ÄNDRAS ---
+            # Om tabellens innehåll skiljer sig mot app_data sparar vi direkt
+            current_records = edited_df.to_dict(orient="records")
+            
+            # Sortera raderna efter befintliga Pärmnummer
+            def parse_parm(val):
+                try:
+                    return int(val)
+                except (ValueError, TypeError):
+                    return 0
+
+            current_records.sort(key=lambda x: parse_parm(x.get("Pärmnummer", 0)))
+            
+            # Justera pärmnummer 1, 2, 3... (sänker siffror om en rad raderats)
+            synced_collection = []
+            has_changes = False
+            
+            if len(current_records) != len(app_data.get("collection", [])):
+                has_changes = True
+
+            for idx, record in enumerate(current_records, start=1):
+                if record.get("Pärmnummer") != idx:
+                    record["Pärmnummer"] = idx
+                    has_changes = True
+                
+                if not record.get("Bild") and (idx - 1) < len(app_data["collection"]):
+                    record["Bild"] = app_data["collection"][idx - 1].get("Bild", "")
+
+                synced_collection.append(record)
+
+            if has_changes:
+                app_data["collection"] = synced_collection
+                save_data_to_github(app_data)
+                st.session_state["editor_version"] += 1
+                st.rerun()
+
             st.divider()
             
             max_rows = len(edited_df)
@@ -349,42 +386,7 @@ with tab1:
                 if dlg_idx < len(app_data["collection"]):
                     real_card_data = app_data["collection"][dlg_idx]
                     show_card_dialog(dlg_idx, real_card_data)
-            
-            st.divider()
-            if st.button("💾 Spara alla ändringar i samlingen", type="primary", use_container_width=True):
-                edited_records = edited_df.to_dict(orient="records")
-                
-                # 1. Sortera raderna efter befintligt Pärmnummer
-                def parse_parm(val):
-                    try:
-                        return int(val)
-                    except (ValueError, TypeError):
-                        return 0
 
-                edited_records.sort(key=lambda x: parse_parm(x.get("Pärmnummer", 0)))
-                
-                # 2. Om rader raderades sänks alla efterföljande kort med ett heltal (1, 2, 3...)
-                new_collection = []
-                for idx, record in enumerate(edited_records, start=1):
-                    record["Pärmnummer"] = int(idx)
-                    
-                    if not record.get("Bild") and (idx - 1) < len(app_data["collection"]):
-                        record["Bild"] = app_data["collection"][idx - 1].get("Bild", "")
-
-                    if str(record.get("Bild")).startswith("data:image"):
-                        for orig_item in app_data["collection"]:
-                            if orig_item.get("Namn") == record.get("Namn") and orig_item.get("Setnr.") == record.get("Setnr."):
-                                record["Bild"] = orig_item.get("Bild", "")
-                                break
-
-                    new_collection.append(record)
-                
-                app_data["collection"] = new_collection
-                save_data_to_github(app_data)
-                
-                st.session_state["editor_version"] += 1
-                st.success("Samlingen sparades och pärmnumren justerades!")
-                st.rerun()
         else:
             st.dataframe(
                 df_display,
@@ -408,58 +410,8 @@ with tab1:
     else:
         st.info("Samlingen är tom.")
 
-# --- FLIK 2: REDIGERINGSLÄGE FÖR TEXT/DATA ---
+# --- FLIK 2: LÄGG TILL NYTT KORT ---
 with tab2:
-    st.subheader("✏️ Massredigera text och värden")
-    collection_df = pd.DataFrame(app_data.get("collection", []))
-    
-    if not collection_df.empty:
-        df_display = collection_df.copy()
-        columns_order = [
-            "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
-            "Övrigt", "Skick", "Köpt för (EUR)", "Köpt för (SEK)", 
-            "Värde (EUR)", "Datum tillagd", "Värde idag (SEK)"
-        ]
-        
-        editable_config = {
-            "Bild": st.column_config.ImageColumn("Bild", width="small"),
-            "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
-            "Språk": st.column_config.TextColumn("Språk", width="small"),
-            "Namn": st.column_config.TextColumn("Namn", width="medium"),
-            "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
-            "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
-            "Set": st.column_config.TextColumn("Set", width="large"),
-            "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
-            "Skick": st.column_config.TextColumn("Skick", width="small"),
-            "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", width="small", format="%.2f"),
-            "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", width="small", format="%.2f"),
-        }
-
-        tab2_key = f"text_editor_v_{st.session_state['editor_version']}"
-        edited_df = st.data_editor(
-            df_display,
-            column_order=columns_order,
-            column_config=editable_config,
-            num_rows="dynamic",
-            use_container_width=True,
-            key=tab2_key
-        )
-        
-        if st.button("💾 Spara alla textändringar till GitHub", type="primary"):
-            edited_records = edited_df.to_dict(orient="records")
-            for idx, record in enumerate(edited_records):
-                if idx < len(app_data["collection"]):
-                    if not record.get("Bild"):
-                        record["Bild"] = app_data["collection"][idx].get("Bild", "")
-            app_data["collection"] = edited_records
-            save_data_to_github(app_data)
-            
-            st.session_state["editor_version"] += 1
-            st.success("Samlingen sparades!")
-            st.rerun()
-
-# --- FLIK 3: LÄGG TILL NYTT KORT ---
-with tab3:
     st.subheader("➕ Lägg till nytt kort")
     
     if "new_card_rotation" not in st.session_state:
@@ -573,8 +525,8 @@ with tab3:
         st.success(f"Kortet {namn} skapades och sparades på pärmnummer {target_parm}! Alla efterföljande nummer knuffades upp 1 steg.")
         st.rerun()
 
-# --- FLIK 4: HANTERA INSTÄLLNINGAR (SET, NAMN, SPRÅK, ETC) ---
-with tab4:
+# --- FLIK 3: HANTERA INSTÄLLNINGAR (SET, NAMN, SPRÅK, ETC) ---
+with tab3:
     st.subheader("⚙️ Hantera val och alternativ")
     
     col_set, col_other = st.columns(2)
