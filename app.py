@@ -12,8 +12,28 @@ st.set_page_config(
     page_title="Pokémon Samling", 
     page_icon="🎴",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
+
+# --- VALUTAKURS-FUNKTION (Cachad 24 timmar = 86400 sekunder) ---
+@st.cache_data(ttl=86400)
+def fetch_eur_to_sek_rate():
+    """
+    Hämtar senast gällande växelkurs för EUR/SEK från ett öppet API.
+    Cachas i 24 timmar så att det bara görs 1 anrop per dag automatiskt.
+    """
+    try:
+        url = "https://open.er-api.com/v6/latest/EUR"
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            rate = data.get("rates", {}).get("SEK")
+            if rate:
+                return round(float(rate), 4)
+    except Exception:
+        pass
+    # Reservkurs om API:et mot förmodan skulle ligga nere
+    return 11.5
 
 # --- GITHUB CONFIG & INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
@@ -82,13 +102,11 @@ def get_image_as_base64(url):
         
     return "https://assets.tcgdex.net/back.png"
 
-# --- HJÄLPFUNKTION FÖR GOOGLE-SÖKNING ---
 def generate_google_cardmarket_url(name, number, set_name):
     clean_name = re.sub(r'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9faf]', '', name).strip()
     query = f"{clean_name} {number} {set_name} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
-# --- SÖKFUNKTION (Endast för att hitta bilder/namn/set) ---
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
     if not query:
@@ -167,7 +185,7 @@ def search_pokemon_cards(query):
 
     return results
 
-# --- INITIERA SESSION STATE ---
+# --- INITIERA SESSION STATE & HÄMTA EUR-KURS ---
 if "app_data" not in st.session_state:
     st.session_state["app_data"] = load_data_from_github()
 
@@ -175,8 +193,17 @@ app_data = st.session_state["app_data"]
 if "collection" not in app_data:
     app_data["collection"] = []
 
-usd_to_sek = 10.5
-eur_to_sek = 11.5
+# Dagsaktuell EUR-kurs (hämtas 1 gång/dag eller via knapp)
+eur_to_sek = fetch_eur_to_sek_rate()
+
+# --- SIDOPANEL / KURSINFORMATION & MANUELL KNAPP ---
+with st.sidebar:
+    st.header("💱 Valutakurs")
+    st.info(f"**Aktuell kurs:** 1 EUR = **{eur_to_sek:.4f} SEK**")
+    if st.button("🔄 Uppdatera växelkurs nu"):
+        fetch_eur_to_sek_rate.clear()
+        st.success("Växelkursen har uppdaterats!")
+        st.rerun()
 
 # --- LAYOUT & TABS ---
 tab1, tab2 = st.tabs(["📊 Samling", "➕ Sök & Lägg till kort"])
@@ -191,15 +218,20 @@ with tab1:
     if collection:
         df = pd.DataFrame(collection)
         
-        # Säkerställ alla fält
-        for col in ["Värde (USD)", "Köpt för (EUR)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn"]:
+        # Säkerställ bakåtkompatibilitet
+        if "Värde (USD)" in df.columns and "Värde (EUR)" not in df.columns:
+            df["Värde (EUR)"] = df["Värde (USD)"]
+        
+        for col in ["Värde (EUR)", "Köpt för (EUR)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn"]:
             if col not in df.columns:
                 df[col] = 0.0 if "Värde" in col or "Köpt" in col else ""
         
-        df["Värde (USD)"] = pd.to_numeric(df["Värde (USD)"], errors='coerce').fillna(0.0)
+        df["Värde (EUR)"] = pd.to_numeric(df["Värde (EUR)"], errors='coerce').fillna(0.0)
         df["Köpt för (EUR)"] = pd.to_numeric(df["Köpt för (EUR)"], errors='coerce').fillna(0.0)
+        
+        # Räkna om till SEK dynamiskt baserat på dagens EUR-kurs
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * eur_to_sek).round(2)
-        df["Värde idag (SEK)"] = (df["Värde (USD)"] * usd_to_sek).round(2)
+        df["Värde idag (SEK)"] = (df["Värde (EUR)"] * eur_to_sek).round(2)
         
         if "Bild" in df.columns:
             df["Bild"] = df["Bild"].apply(get_image_as_base64)
@@ -210,7 +242,7 @@ with tab1:
 
         columns_order = [
             "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
-            "Övrigt", "Skick", "Köpt för (EUR)", "Värde (USD)", "Värde idag (SEK)", "Google Sök", "Egen Cardmarket Länk"
+            "Övrigt", "Skick", "Köpt för (EUR)", "Värde (EUR)", "Värde idag (SEK)", "Google Sök", "Egen Cardmarket Länk"
         ]
 
         if not edit_mode:
@@ -224,8 +256,8 @@ with tab1:
                 "Set": st.column_config.TextColumn("Set", width="medium"),
                 "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
                 "Skick": st.column_config.TextColumn("Skick", width="small"),
-                "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
-                "Värde (USD)": st.column_config.NumberColumn("Värde ($)", format="$%.2f", width="small"),
+                "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="€%.2f", width="small"),
+                "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="€%.2f", width="small"),
                 "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width="small"),
                 "Google Sök": st.column_config.LinkColumn("Sök Cardmarket", display_text="🔍 Google Sök", width="medium"),
                 "Egen Cardmarket Länk": st.column_config.LinkColumn("Min Cardmarket Länk", display_text="🔗 Öppna Sida", width="medium")
@@ -244,7 +276,7 @@ with tab1:
                 "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
                 "Skick": st.column_config.TextColumn("Skick", width="small"),
                 "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
-                "Värde (USD)": st.column_config.NumberColumn("Värde ($)", format="%.2f", width="small"),
+                "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width="small"),
                 "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width="small", disabled=True),
                 "Google Sök": st.column_config.TextColumn("Google Sök URL", disabled=True, width="medium"),
                 "Egen Cardmarket Länk": st.column_config.TextColumn("Klistra in Cardmarket URL här", width="large")
@@ -263,11 +295,10 @@ with tab1:
                     updated_list = edited_df.to_dict(orient="records")
                     for item in updated_list:
                         k_eur = float(item.get("Köpt för (EUR)", 0.0) or 0.0)
-                        v_usd = float(item.get("Värde (USD)", 0.0) or 0.0)
+                        v_eur = float(item.get("Värde (EUR)", 0.0) or 0.0)
                         item["Köpt för (SEK)"] = round(k_eur * eur_to_sek, 2)
-                        item["Värde idag (SEK)"] = round(v_usd * usd_to_sek, 2)
+                        item["Värde idag (SEK)"] = round(v_eur * eur_to_sek, 2)
                         
-                        # Generera alltid om google-sökningen ifall man ändrat namn/set
                         s_name = item.get("Engelskt Namn") or item.get("Namn", "")
                         item["Google Sök"] = generate_google_cardmarket_url(s_name, item.get("Setnr.", ""), item.get("Set", ""))
 
@@ -334,7 +365,7 @@ with tab2:
                             with c_b:
                                 rarity = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], index=0)
                                 kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5)
-                                varde_usd_manual = st.number_input("Värde ($ - Manuellt)", min_value=0.0, value=0.0, step=0.5)
+                                varde_eur_manual = st.number_input("Värde (EUR)", min_value=0.0, value=0.0, step=0.5)
                                 custom_link = st.text_input("Klistra in Cardmarket-länk (Valfritt):", value="")
                             
                             custom_img_url = st.text_input("Bild-URL (Klistra in länk om bilden saknas):", value=api_img_url)
@@ -356,8 +387,8 @@ with tab2:
                                     "Skick": cond,
                                     "Köpt för (EUR)": kopt_eur,
                                     "Köpt för (SEK)": round(kopt_eur * eur_to_sek, 2),
-                                    "Värde (USD)": varde_usd_manual,
-                                    "Värde idag (SEK)": round(varde_usd_manual * usd_to_sek, 2),
+                                    "Värde (EUR)": varde_eur_manual,
+                                    "Värde idag (SEK)": round(varde_eur_manual * eur_to_sek, 2),
                                     "Datum tillagd": date.today().strftime("%Y-%m-%d"),
                                     "Google Sök": google_url,
                                     "Egen Cardmarket Länk": custom_link.strip()
