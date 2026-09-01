@@ -12,16 +12,12 @@ st.set_page_config(
     page_title="Pokémon Samling", 
     page_icon="🎴",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # --- VALUTAKURS-FUNKTION (Cachad 24 timmar = 86400 sekunder) ---
 @st.cache_data(ttl=86400)
 def fetch_eur_to_sek_rate():
-    """
-    Hämtar senast gällande växelkurs för EUR/SEK från ett öppet API.
-    Cachas i 24 timmar så att det bara görs 1 anrop per dag automatiskt.
-    """
     try:
         url = "https://open.er-api.com/v6/latest/EUR"
         res = requests.get(url, timeout=5)
@@ -32,8 +28,7 @@ def fetch_eur_to_sek_rate():
                 return round(float(rate), 4)
     except Exception:
         pass
-    # Reservkurs om API:et mot förmodan skulle ligga nere
-    return 11.5
+    return 11.50
 
 # --- GITHUB CONFIG & INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
@@ -193,32 +188,34 @@ app_data = st.session_state["app_data"]
 if "collection" not in app_data:
     app_data["collection"] = []
 
-# Dagsaktuell EUR-kurs (hämtas 1 gång/dag eller via knapp)
 eur_to_sek = fetch_eur_to_sek_rate()
-
-# --- SIDOPANEL / KURSINFORMATION & MANUELL KNAPP ---
-with st.sidebar:
-    st.header("💱 Valutakurs")
-    st.info(f"**Aktuell kurs:** 1 EUR = **{eur_to_sek:.4f} SEK**")
-    if st.button("🔄 Uppdatera växelkurs nu"):
-        fetch_eur_to_sek_rate.clear()
-        st.success("Växelkursen har uppdaterats!")
-        st.rerun()
 
 # --- LAYOUT & TABS ---
 tab1, tab2 = st.tabs(["📊 Samling", "➕ Sök & Lägg till kort"])
 
 # --- FLIK 1: SAMLING ---
 with tab1:
-    st.subheader("Min Samling")
+    # Rubrik och valutakurs i samma rad (placerad snyggt till höger)
+    col_header, col_rate = st.columns([2, 3])
     
+    with col_header:
+        st.subheader("Min Samling")
+        
+    with col_rate:
+        c_rate_txt, c_rate_btn = st.columns([2, 1])
+        with c_rate_txt:
+            st.info(f"💱 **Aktuell kurs:** 1 EUR = **{eur_to_sek:.2f} SEK**")
+        with c_rate_btn:
+            if st.button("🔄 Uppdatera", help="Hämta senast gällande växelkurs"):
+                fetch_eur_to_sek_rate.clear()
+                st.rerun()
+
     app_data["collection"] = renumber_collection(app_data.get("collection", []))
     collection = app_data["collection"]
     
     if collection:
         df = pd.DataFrame(collection)
         
-        # Säkerställ bakåtkompatibilitet
         if "Värde (USD)" in df.columns and "Värde (EUR)" not in df.columns:
             df["Värde (EUR)"] = df["Värde (USD)"]
         
@@ -229,7 +226,6 @@ with tab1:
         df["Värde (EUR)"] = pd.to_numeric(df["Värde (EUR)"], errors='coerce').fillna(0.0)
         df["Köpt för (EUR)"] = pd.to_numeric(df["Köpt för (EUR)"], errors='coerce').fillna(0.0)
         
-        # Räkna om till SEK dynamiskt baserat på dagens EUR-kurs
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * eur_to_sek).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * eur_to_sek).round(2)
         
