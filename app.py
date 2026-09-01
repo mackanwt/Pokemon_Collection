@@ -185,12 +185,12 @@ with tab1:
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * current_rate).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * current_rate).round(2)
         
-        # Säkerställ reservbild om fältet är tomt
         if "Bild" in df.columns:
             df["Bild"] = df["Bild"].apply(lambda x: x if (x and str(x).startswith("http")) else "https://assets.tcgdex.net/back.png")
 
-        col_actions1, col_actions2 = st.columns([2, 1])
-        with col_actions1:
+        # ÅTGÄRDSRAD MED EDITERINGSLÄGE
+        col_act1, col_act2, col_act3 = st.columns([2, 1, 1])
+        with col_act1:
             if st.button("🔄 Uppdatera priser (30-dagars snitt från Cardmarket)", type="secondary"):
                 with st.spinner("Hämtar senaste priser från Cardmarket..."):
                     updated_count = 0
@@ -208,43 +208,75 @@ with tab1:
                     st.success(f"Uppdaterade priser för {updated_count} kort!")
                     st.rerun()
 
-        with st.expander("🛠️ Hantera / Radera enskilt kort", expanded=False):
-            col_del1, col_del2 = st.columns([3, 1])
-            with col_del1:
-                del_parm = st.number_input("Välj Pärmnummer att radera:", min_value=1, max_value=len(df), value=1)
-            with col_del2:
-                st.write("")
-                if st.button("🗑️ Radera kort", type="primary", use_container_width=True):
-                    idx_to_remove = del_parm - 1
-                    removed_card = app_data["collection"].pop(idx_to_remove)
-                    app_data["collection"] = renumber_collection(app_data["collection"])
-                    save_data_to_github(app_data)
-                    st.session_state["app_data"] = app_data
-                    st.success(f"Raderade #{del_parm} ({removed_card.get('Namn')})")
-                    st.rerun()
+        with col_act2:
+            edit_mode = st.checkbox("✏️ Aktivera redigeringsläge")
 
         columns_order = [
             "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
             "Övrigt", "Skick", "Köpt för (EUR)", "Värde (EUR)", "Värde idag (SEK)", "Cardmarket"
         ]
-        
-        column_config = {
-            "Bild": st.column_config.ImageColumn("Bild", width="small"),
-            "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
-            "Språk": st.column_config.TextColumn("Språk", width="small"),
-            "Namn": st.column_config.TextColumn("Namn", width="medium"),
-            "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
-            "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
-            "Set": st.column_config.TextColumn("Set", width="medium"),
-            "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
-            "Skick": st.column_config.TextColumn("Skick", width="small"),
-            "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
-            "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width="small"),
-            "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f", width="small"),
-            "Cardmarket": st.column_config.LinkColumn("Cardmarket", display_text="🔗 Cardmarket", width="medium")
-        }
 
-        st.dataframe(df[columns_order], column_config=column_config, use_container_width=True, hide_index=True)
+        if not edit_mode:
+            column_config = {
+                "Bild": st.column_config.ImageColumn("Bild", width="small"),
+                "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
+                "Språk": st.column_config.TextColumn("Språk", width="small"),
+                "Namn": st.column_config.TextColumn("Namn", width="medium"),
+                "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
+                "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
+                "Set": st.column_config.TextColumn("Set", width="medium"),
+                "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
+                "Skick": st.column_config.TextColumn("Skick", width="small"),
+                "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
+                "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width="small"),
+                "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f", width="small"),
+                "Cardmarket": st.column_config.LinkColumn("Cardmarket", display_text="🔗 Cardmarket", width="medium")
+            }
+            st.dataframe(df[columns_order], column_config=column_config, use_container_width=True, hide_index=True)
+        
+        else:
+            st.info("💡 Du kan nu ändra värden direkt i cellerna nedan, klistra in en ny Bild-URL, eller markera rader och trycka Delete för att ta bort kort.")
+            
+            column_config_edit = {
+                "Bild": st.column_config.TextColumn("Bild-URL", width="medium"),
+                "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
+                "Språk": st.column_config.TextColumn("Språk", width="small"),
+                "Namn": st.column_config.TextColumn("Namn", width="medium"),
+                "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
+                "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
+                "Set": st.column_config.TextColumn("Set", width="medium"),
+                "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
+                "Skick": st.column_config.TextColumn("Skick", width="small"),
+                "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
+                "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width="small"),
+                "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f", width="small", disabled=True),
+                "Cardmarket": st.column_config.TextColumn("Cardmarket URL", width="medium")
+            }
+
+            edited_df = st.data_editor(
+                df[columns_order],
+                column_config=column_config_edit,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="dynamic"
+            )
+
+            with col_act3:
+                if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
+                    updated_list = edited_df.to_dict(orient="records")
+                    
+                    # Beräkna om SEK-priser och numrera om efter pärmnummer
+                    for item in updated_list:
+                        k_eur = float(item.get("Köpt för (EUR)", 0.0) or 0.0)
+                        v_eur = float(item.get("Värde (EUR)", 0.0) or 0.0)
+                        item["Köpt för (SEK)"] = round(k_eur * current_rate, 2)
+                        item["Värde idag (SEK)"] = round(v_eur * current_rate, 2)
+                    
+                    app_data["collection"] = renumber_collection(updated_list)
+                    st.session_state["app_data"] = app_data
+                    save_data_to_github(app_data)
+                    st.success("Ändringarna sparades!")
+                    st.rerun()
 
         st.divider()
         c1, c2, c3 = st.columns(3)
@@ -305,7 +337,6 @@ with tab2:
                                 kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5)
                                 varde_eur = st.number_input("Värde (EUR - Manuellt)", min_value=0.0, value=2.70, step=0.5)
                             
-                            # Manuellt fält för bild-länk om API saknar bild
                             custom_img_url = st.text_input("Bild-URL (Klistra in länk om bilden saknas):", value=api_img_url)
 
                             if st.form_submit_button("➕ Lägg till i samlingen", type="primary", use_container_width=True):
@@ -313,7 +344,6 @@ with tab2:
                                 cm_price = fetch_cardmarket_price(cm_url)
                                 final_price = varde_eur if varde_eur > 0 else (cm_price if cm_price else 0.0)
                                 
-                                # Använd manuell URL i första hand, sedan API, sist baksida
                                 final_img = custom_img_url.strip() if custom_img_url.strip() else (api_img_url if api_img_url else "https://assets.tcgdex.net/back.png")
 
                                 new_entry = {
