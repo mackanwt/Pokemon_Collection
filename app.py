@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- VALUTAKURS-FUNKTION (Cachad 24 timmar = 86400 sekunder) ---
+# --- VALUTAKURS-FUNKTION ---
 @st.cache_data(ttl=86400)
 def fetch_eur_to_sek_rate():
     try:
@@ -50,24 +50,35 @@ def load_data_from_github():
 
 def save_data_to_github(data_dict):
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        return False
+        return False, "GITHUB_TOKEN eller GITHUB_REPO saknas i Secrets!"
+    
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    # Hämta sha från befintlig fil
+    sha = None
     res = requests.get(url, headers=headers)
-    sha = res.json()["sha"] if res.status_code == 200 else None
+    if res.status_code == 200:
+        sha = res.json().get("sha")
     
     content_str = json.dumps(data_dict, indent=2, ensure_ascii=False)
     encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
     
     payload = {
-        "message": "Uppdaterade samlingsdata",
+        "message": "Uppdaterade samlingsdata via Streamlit",
         "content": encoded_content
     }
     if sha:
         payload["sha"] = sha
         
     put_res = requests.put(url, json=payload, headers=headers)
-    return put_res.status_code in [200, 201]
+    if put_res.status_code in [200, 201]:
+        return True, "Sparat!"
+    else:
+        return False, f"GitHub felkode {put_res.status_code}: {put_res.text}"
 
 def renumber_collection(collection_list):
     sorted_list = sorted(collection_list, key=lambda x: int(x.get("Pärmnummer", 0) or 0))
@@ -195,7 +206,6 @@ tab1, tab2 = st.tabs(["📊 Samling", "➕ Sök & Lägg till kort"])
 
 # --- FLIK 1: SAMLING ---
 with tab1:
-    # Rubrik och valutakurs i samma rad (placerad snyggt till höger)
     col_header, col_rate = st.columns([2, 3])
     
     with col_header:
@@ -300,9 +310,13 @@ with tab1:
 
                     app_data["collection"] = renumber_collection(updated_list)
                     st.session_state["app_data"] = app_data
-                    save_data_to_github(app_data)
-                    st.success("Ändringarna sparades!")
-                    st.rerun()
+                    
+                    success, msg = save_data_to_github(app_data)
+                    if success:
+                        st.success("Ändringarna sparades till GitHub!")
+                        st.rerun()
+                    else:
+                        st.error(f"Kunde inte spara till GitHub: {msg}")
 
         st.divider()
         c1, c2, c3 = st.columns(3)
@@ -398,7 +412,10 @@ with tab2:
                                 app_data["collection"] = renumber_collection(app_data["collection"])
                                 
                                 st.session_state["app_data"] = app_data
-                                save_data_to_github(app_data)
-                                st.success(f"Lade till {card_name} (#{parm_nr})!")
-                                st.rerun()
+                                success, msg = save_data_to_github(app_data)
+                                if success:
+                                    st.success(f"Lade till {card_name} (#{parm_nr})!")
+                                    st.rerun()
+                                else:
+                                    st.error(f"Kunde inte spara till GitHub: {msg}")
                     st.divider()
