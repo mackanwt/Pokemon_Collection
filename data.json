@@ -1,3 +1,24 @@
 {
-  "collection": []
+  "collection": [
+    {
+      "_id": "6f47b6be-47ed-483c-a335-e278771e9fa3",
+      "Bild": "",
+      "Pärmnummer": 1,
+      "Språk": "JPN",
+      "Namn": "アローラライチュウ",
+      "Engelskt Namn": "アローラライチュウ",
+      "Setnr.": "016",
+      "SetBet.": "SM4A",
+      "Set": "Ultradimensional Beasts",
+      "Övrigt": "Holo",
+      "Skick": "NM",
+      "Köpt för (EUR)": 3.33,
+      "Köpt för (SEK)": 37.05,
+      "Värde (EUR)": 2.78,
+      "Värde idag (SEK)": 30.93,
+      "Datum tillagd": "2026-09-01",
+      "Google Sök": "https://www.google.com/search?q=%20016%20Ultradimensional%20Beasts%20cardmarket",
+      "Egen Cardmarket Länk": ""
+    }
+  ]
 }
