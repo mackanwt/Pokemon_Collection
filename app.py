@@ -80,7 +80,7 @@ def load_data_from_github():
     raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
-        res = requests.get(raw_url, headers=headers)
+        res = requests.get(raw_url, headers=headers, params={"t": str(uuid.uuid4())}) # Undvik HTTP-cache
         if res.status_code == 200:
             return json.loads(res.text)
     except Exception:
@@ -119,7 +119,7 @@ def save_data_to_github(data_dict):
         return False, f"GitHub felkod {put_res.status_code}: {put_res.text}"
 
 def fix_existing_collection(collection_list):
-    """Säkerställer unika ID:n, giltiga bildlänkar och korrekta setnamn"""
+    """Säkerställer unika ID:n och korrekta setnamn"""
     for idx, card in enumerate(collection_list):
         if "_id" not in card or not card["_id"]:
             card["_id"] = str(uuid.uuid4())
@@ -223,8 +223,11 @@ def search_pokemon_cards(query):
 
     return results
 
-# --- INITIERA SESSION STATE & HÄMTA EUR-KURS ---
-if "app_data" not in st.session_state:
+# --- INITIERA SESSION STATE ---
+if "editor_version" not in st.session_state:
+    st.session_state["editor_version"] = 0
+
+if "app_data" not in st.session_state or st.session_state["app_data"] is None:
     st.session_state["app_data"] = load_data_from_github()
 
 app_data = st.session_state["app_data"]
@@ -232,7 +235,6 @@ if "collection" not in app_data:
     app_data["collection"] = []
 
 app_data["collection"] = fix_existing_collection(app_data["collection"])
-
 eur_to_sek = fetch_eur_to_sek_rate()
 
 # --- LAYOUT & TABS ---
@@ -252,9 +254,10 @@ with tab1:
         with c_rate_btn:
             if st.button("🔄 Uppdatera", help="Hämta senast gällande växelkurs"):
                 fetch_eur_to_sek_rate.clear()
+                st.session_state["app_data"] = None
                 st.rerun()
 
-    # Sortera alltid på Pärmnummer i grunddata
+    # Sortera alltid på Pärmnummer
     collection = sorted(app_data.get("collection", []), key=lambda x: int(x.get("Pärmnummer", 0) or 0))
     app_data["collection"] = collection
     
@@ -307,7 +310,7 @@ with tab1:
         
         else:
             column_config_edit = {
-                "_id": None, # Dölj ID-fältet från redigeraren
+                "_id": None,
                 "Bild": st.column_config.TextColumn("Bild-URL", width="medium"),
                 "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small", step=1),
                 "Språk": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width="small"),
@@ -324,8 +327,10 @@ with tab1:
                 "Egen Cardmarket Länk": st.column_config.TextColumn("Klistra in Cardmarket URL här", width="large")
             }
 
-            # Inkludera _id i df för redigeraren så vi behåller spårbarhet
             edit_columns = ["_id"] + columns_order
+            
+            # Unikt key-namn varje gång för att kasta gamla cachen vid sparning
+            editor_key = f"collection_editor_v{st.session_state['editor_version']}"
 
             edited_df = st.data_editor(
                 df[edit_columns],
@@ -333,15 +338,13 @@ with tab1:
                 use_container_width=True,
                 hide_index=True,
                 num_rows="dynamic",
-                key="collection_editor"
+                key=editor_key
             )
 
             with col_act2:
                 if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
                     raw_edited = edited_df.to_dict(orient="records")
                     
-                    # 1. Sortera raderna baserat på det nya inmatade Pärmnumret
-                    # Om två kort har samma siffra behålls den inbördes ordningen
                     for idx, row in enumerate(raw_edited):
                         try:
                             row["_target_parm"] = float(row.get("Pärmnummer", 0) or 0)
@@ -351,10 +354,9 @@ with tab1:
 
                     sorted_edited = sorted(raw_edited, key=lambda x: (x["_target_parm"], x["_orig_order"]))
 
-                    # 2. Uppdatera alla fält och tilldela sekventiella Pärmnummer (1, 2, 3...)
                     final_list = []
                     for seq_nr, row in enumerate(sorted_edited, start=1):
-                        row["Pärmnummer"] = seq_nr
+                        row["Pärmnummer"] = int(seq_nr)
                         row.pop("_target_parm", None)
                         row.pop("_orig_order", None)
 
@@ -368,13 +370,13 @@ with tab1:
                         
                         final_list.append(row)
 
-                    app_data["collection"] = final_list
-                    st.session_state["app_data"] = app_data
+                    save_payload = {"collection": final_list}
+                    success, msg = save_data_to_github(save_payload)
                     
-                    success, msg = save_data_to_github(app_data)
                     if success:
-                        if "collection_editor" in st.session_state:
-                            del st.session_state["collection_editor"]
+                        # Tvinga hela appen att ladda om datan från grunden
+                        st.session_state["app_data"] = None 
+                        st.session_state["editor_version"] += 1
                         st.success("Ändringarna sparades och ordningen uppdaterades!")
                         st.rerun()
                     else:
@@ -482,13 +484,12 @@ with tab2:
                                 sorted_coll = sorted(app_data["collection"], key=lambda x: int(x.get("Pärmnummer", 0) or 0))
                                 for idx, card in enumerate(sorted_coll, start=1):
                                     card["Pärmnummer"] = idx
-                                app_data["collection"] = sorted_coll
                                 
-                                st.session_state["app_data"] = app_data
-                                success, msg = save_data_to_github(app_data)
+                                save_payload = {"collection": sorted_coll}
+                                success, msg = save_data_to_github(save_payload)
                                 if success:
-                                    if "collection_editor" in st.session_state:
-                                        del st.session_state["collection_editor"]
+                                    st.session_state["app_data"] = None
+                                    st.session_state["editor_version"] += 1
                                     st.success(f"Lade till {card_name} (#{parm_nr})!")
                                     st.rerun()
                                 else:
