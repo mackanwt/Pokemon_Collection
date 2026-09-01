@@ -1,3 +1,21 @@
 {
-  "collection": []
+  "collection": [
+    {
+      "Bild": "",
+      "Pärmnummer": 1,
+      "Språk": "JPN",
+      "Namn": "アローラライチュウ",
+      "Setnr.": "016",
+      "SetBet.": "SM4A",
+      "Set": "Transdimensional Crimson Impact",
+      "Övrigt": "Holo",
+      "Skick": "NM",
+      "Köpt för (EUR)": 0.0,
+      "Köpt för (SEK)": 0.0,
+      "Värde (EUR)": 0.0,
+      "Värde idag (SEK)": 0.0,
+      "Datum tillagd": "2026-09-01",
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=SM4A+016&language=7&minCondition=2"
+    }
+  ]
 }
