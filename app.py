@@ -120,12 +120,6 @@ def save_data_to_github(data_dict):
     else:
         return False, f"GitHub felkod {put_res.status_code}: {put_res.text}"
 
-def renumber_collection(collection_list):
-    sorted_list = sorted(collection_list, key=lambda x: int(x.get("Pärmnummer", 0) or 0))
-    for idx, card in enumerate(sorted_list, start=1):
-        card["Pärmnummer"] = idx
-    return sorted_list
-
 def fix_existing_collection_sets(collection_list):
     """Rensar gamla felaktiga setnamn i den sparade samlingen"""
     for card in collection_list:
@@ -281,8 +275,9 @@ with tab1:
                 fetch_eur_to_sek_rate.clear()
                 st.rerun()
 
-    app_data["collection"] = renumber_collection(app_data.get("collection", []))
-    collection = app_data["collection"]
+    # Säkerställ sortering utifrån Pärmnummer
+    collection = sorted(app_data.get("collection", []), key=lambda x: int(x.get("Pärmnummer", 0) or 0))
+    app_data["collection"] = collection
     
     if collection:
         df = pd.DataFrame(collection)
@@ -302,7 +297,7 @@ with tab1:
 
         col_act1, col_act2 = st.columns([3, 1])
         with col_act1:
-            edit_mode = st.checkbox("✏️ Aktivera redigeringsläge (Mata in värden & egna länkar)")
+            edit_mode = st.checkbox("✏️ Aktivera redigeringsläge (Mata in värden & egna länkar)", key="edit_mode_checkbox")
 
         columns_order = [
             "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
@@ -361,27 +356,51 @@ with tab1:
 
             with col_act2:
                 if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
-                    updated_list = edited_df.to_dict(orient="records")
+                    # 1. Hämta ändrad lista
+                    raw_edited = edited_df.to_dict(orient="records")
                     
-                    # Sortera baserat på det manuellt inmatade pärmnumret
-                    updated_list = sorted(updated_list, key=lambda x: int(x.get("Pärmnummer", 0) or 0))
+                    # 2. Skapa en stabil sortering.
+                    # Om två kort har fått samma Pärmnummer (t.ex. båda är 1), 
+                    # vill vi att det nyligen ändrade hamnar först och det gamla skjuts bakåt.
+                    old_order_map = {id(orig): idx for idx, orig in enumerate(collection)}
                     
-                    for item in updated_list:
-                        k_eur = float(item.get("Köpt för (EUR)", 0.0) or 0.0)
-                        v_eur = float(item.get("Värde (EUR)", 0.0) or 0.0)
-                        item["Köpt för (SEK)"] = round(k_eur * eur_to_sek, 2)
-                        item["Värde idag (SEK)"] = round(v_eur * eur_to_sek, 2)
-                        
-                        s_name = item.get("Engelskt Namn") or item.get("Namn") or ""
-                        item["Google Sök"] = generate_google_cardmarket_url(s_name, item.get("Setnr.", ""), item.get("Set", ""))
+                    # Sorteringsnyckel: 1. Inmatat Pärmnummer, 2. Ursprunglig placering
+                    for idx, row in enumerate(raw_edited):
+                        row["_tmp_parm"] = float(row.get("Pärmnummer", 0) or 0)
+                        row["_tmp_idx"] = idx
 
-                    # Renumrera sekventiellt (1, 2, 3...) efter den nya sorteringen
-                    app_data["collection"] = renumber_collection(updated_list)
+                    sorted_rows = sorted(raw_edited, key=lambda x: (x["_tmp_parm"], x["_tmp_idx"]))
+
+                    # 3. Renumrera alla kort sekventiellt (1, 2, 3...)
+                    final_list = []
+                    for new_pärmnr, row in enumerate(sorted_rows, start=1):
+                        row["Pärmnummer"] = new_pärmnr
+                        
+                        # Ta bort temporära nycklar
+                        row.pop("_tmp_parm", None)
+                        row.pop("_tmp_idx", None)
+                        
+                        k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
+                        v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
+                        row["Köpt för (SEK)"] = round(k_eur * eur_to_sek, 2)
+                        row["Värde idag (SEK)"] = round(v_eur * eur_to_sek, 2)
+                        
+                        s_name = row.get("Engelskt Namn") or row.get("Namn") or ""
+                        row["Google Sök"] = generate_google_cardmarket_url(s_name, row.get("Setnr.", ""), row.get("Set", ""))
+                        
+                        final_list.append(row)
+
+                    # 4. Spara ny samling i state och till GitHub
+                    app_data["collection"] = final_list
                     st.session_state["app_data"] = app_data
                     
                     success, msg = save_data_to_github(app_data)
                     if success:
-                        st.success("Ändringarna sparades och renumrerades!")
+                        # Rensa data_editors interna cache så att den läser in de nya numren korrekt
+                        if "collection_editor" in st.session_state:
+                            del st.session_state["collection_editor"]
+                        st.session_state["edit_mode_checkbox"] = False
+                        st.success("Ändringarna sparades och ordningen uppdaterades!")
                         st.rerun()
                     else:
                         st.error(f"Kunde inte spara till GitHub: {msg}")
@@ -481,11 +500,18 @@ with tab2:
                                         existing_card["Pärmnummer"] = int(existing_card["Pärmnummer"]) + 1
                                         
                                 app_data["collection"].append(new_entry)
-                                app_data["collection"] = renumber_collection(app_data["collection"])
+                                
+                                # Sortera och renumrera
+                                sorted_coll = sorted(app_data["collection"], key=lambda x: int(x.get("Pärmnummer", 0) or 0))
+                                for idx, card in enumerate(sorted_coll, start=1):
+                                    card["Pärmnummer"] = idx
+                                app_data["collection"] = sorted_coll
                                 
                                 st.session_state["app_data"] = app_data
                                 success, msg = save_data_to_github(app_data)
                                 if success:
+                                    if "collection_editor" in st.session_state:
+                                        del st.session_state["collection_editor"]
                                     st.success(f"Lade till {card_name} (#{parm_nr})!")
                                     st.rerun()
                                 else:
