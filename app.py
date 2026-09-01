@@ -113,22 +113,42 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
+# Mappningstabell för japanska/internationella set-ID:n som saknas i engelska TCGdex API:et
+JAPANESE_SET_MAP = {
+    "sm4a": ("Ultradimensional Beasts", "SM4A"),
+    "sm4b": ("GX Battle Boost", "SM4B"),
+    "sm4+": ("GX Battle Boost", "SM4+"),
+    "sm4": ("Crimson Invasion", "CIN"),
+    "sm4s": ("Awakened Heroes", "SM4S"),
+    "sm4m": ("Transdimensional Ultra Beasts", "SM4M"),
+}
+
 @st.cache_data(ttl=3600)
 def get_set_details(set_id):
-    """Hämtar alltid engelskt setnamn och förkortning"""
+    """Hämtar engelskt setnamn och förkortning med fallback-mappning för asiatiska sets"""
     if not set_id:
         return "", ""
+    
+    clean_id = set_id.lower().strip()
+    
+    # 1. Kolla först manuell mappning för asiatiska/speciella set-koder
+    if clean_id in JAPANESE_SET_MAP:
+        return JAPANESE_SET_MAP[clean_id]
+        
+    # 2. Försök annars hämta via TCGdex engelska API
     try:
-        url = f"https://api.tcgdex.net/v2/en/sets/{set_id}"
+        url = f"https://api.tcgdex.net/v2/en/sets/{clean_id}"
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
         if res.status_code == 200:
             data = res.json()
             set_name = data.get("name", "")
             set_abbrev = data.get("abbreviation", "") or data.get("id", "").upper()
-            return set_name, set_abbrev
+            if set_name and set_name.lower() != clean_id:
+                return set_name, set_abbrev
     except Exception:
         pass
-    return set_id.upper(), set_id.upper()
+        
+    return clean_id.upper(), clean_id.upper()
 
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
