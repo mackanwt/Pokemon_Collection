@@ -45,17 +45,14 @@ JAPANESE_SET_MAP = {
 }
 
 def get_set_details_sync(set_id):
-    """Direkt-uppslag för setnamn utan caching-fördröjning"""
     if not set_id:
         return "", ""
     
     clean_id = str(set_id).lower().strip()
     
-    # 1. Tvinga användning av manuell mappning för alla kända japanska set
     if clean_id in JAPANESE_SET_MAP:
         return JAPANESE_SET_MAP[clean_id]
         
-    # 2. Försök med TCGdex engelska API
     try:
         url = f"https://api.tcgdex.net/v2/en/sets/{clean_id}"
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=2)
@@ -121,7 +118,6 @@ def save_data_to_github(data_dict):
         return False, f"GitHub felkod {put_res.status_code}: {put_res.text}"
 
 def fix_existing_collection_sets(collection_list):
-    """Rensar gamla felaktiga setnamn i den sparade samlingen"""
     for card in collection_list:
         current_set = str(card.get("Set") or "").strip()
         set_bet = str(card.get("SetBet.") or "").strip()
@@ -275,7 +271,6 @@ with tab1:
                 fetch_eur_to_sek_rate.clear()
                 st.rerun()
 
-    # Säkerställ sortering utifrån Pärmnummer
     collection = sorted(app_data.get("collection", []), key=lambda x: int(x.get("Pärmnummer", 0) or 0))
     app_data["collection"] = collection
     
@@ -285,10 +280,12 @@ with tab1:
         if "Värde (USD)" in df.columns and "Värde (EUR)" not in df.columns:
             df["Värde (EUR)"] = df["Värde (USD)"]
         
-        for col in ["Värde (EUR)", "Köpt för (EUR)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn", "Bild"]:
+        # Säkerställ att Bild-kolumnen alltid har kvar sin URL
+        for col in ["Bild", "Värde (EUR)", "Köpt för (EUR)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn"]:
             if col not in df.columns:
                 df[col] = 0.0 if "Värde" in col or "Köpt" in col else ""
         
+        df["Bild"] = df["Bild"].fillna("")
         df["Värde (EUR)"] = pd.to_numeric(df["Värde (EUR)"], errors='coerce').fillna(0.0)
         df["Köpt för (EUR)"] = pd.to_numeric(df["Köpt för (EUR)"], errors='coerce').fillna(0.0)
         
@@ -297,7 +294,7 @@ with tab1:
 
         col_act1, col_act2 = st.columns([3, 1])
         with col_act1:
-            edit_mode = st.checkbox("✏️ Aktivera redigeringsläge (Mata in värden & egna länkar)", key="edit_mode_checkbox")
+            edit_mode = st.checkbox("✏️ Aktivera redigeringsläge (Mata in värden & egna länkar)")
 
         columns_order = [
             "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
@@ -356,29 +353,23 @@ with tab1:
 
             with col_act2:
                 if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
-                    # 1. Hämta ändrad lista
                     raw_edited = edited_df.to_dict(orient="records")
                     
-                    # 2. Skapa en stabil sortering.
-                    # Om två kort har fått samma Pärmnummer (t.ex. båda är 1), 
-                    # vill vi att det nyligen ändrade hamnar först och det gamla skjuts bakåt.
-                    old_order_map = {id(orig): idx for idx, orig in enumerate(collection)}
-                    
-                    # Sorteringsnyckel: 1. Inmatat Pärmnummer, 2. Ursprunglig placering
                     for idx, row in enumerate(raw_edited):
                         row["_tmp_parm"] = float(row.get("Pärmnummer", 0) or 0)
                         row["_tmp_idx"] = idx
 
                     sorted_rows = sorted(raw_edited, key=lambda x: (x["_tmp_parm"], x["_tmp_idx"]))
 
-                    # 3. Renumrera alla kort sekventiellt (1, 2, 3...)
                     final_list = []
                     for new_pärmnr, row in enumerate(sorted_rows, start=1):
                         row["Pärmnummer"] = new_pärmnr
-                        
-                        # Ta bort temporära nycklar
                         row.pop("_tmp_parm", None)
                         row.pop("_tmp_idx", None)
+                        
+                        # Bevara befintliga bild-URLer om redigeraren gav tomma strängar
+                        if not row.get("Bild") and idx < len(collection):
+                            row["Bild"] = collection[idx].get("Bild", "")
                         
                         k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
                         v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
@@ -390,16 +381,13 @@ with tab1:
                         
                         final_list.append(row)
 
-                    # 4. Spara ny samling i state och till GitHub
                     app_data["collection"] = final_list
                     st.session_state["app_data"] = app_data
                     
                     success, msg = save_data_to_github(app_data)
                     if success:
-                        # Rensa data_editors interna cache så att den läser in de nya numren korrekt
                         if "collection_editor" in st.session_state:
                             del st.session_state["collection_editor"]
-                        st.session_state["edit_mode_checkbox"] = False
                         st.success("Ändringarna sparades och ordningen uppdaterades!")
                         st.rerun()
                     else:
@@ -501,7 +489,6 @@ with tab2:
                                         
                                 app_data["collection"].append(new_entry)
                                 
-                                # Sortera och renumrera
                                 sorted_coll = sorted(app_data["collection"], key=lambda x: int(x.get("Pärmnummer", 0) or 0))
                                 for idx, card in enumerate(sorted_coll, start=1):
                                     card["Pärmnummer"] = idx
