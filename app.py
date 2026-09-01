@@ -60,14 +60,29 @@ def renumber_collection(collection_list):
         card["Pärmnummer"] = idx
     return sorted_list
 
-def fix_image_url(url):
-    """Kringgår Cardmarkets hotlink-blockering via en proxy så att bilden syns"""
+@st.cache_data(ttl=3600)
+def get_image_as_base64(url):
+    """Hämtar en extern bild och konverterar den till Base64 så att Streamlit alltid kan visa den."""
     if not url or not str(url).startswith("http"):
         return "https://assets.tcgdex.net/back.png"
-    if "cardmarket.com" in url or "s3.cardmarket" in url:
-        clean_url = url.replace("https://", "").replace("http://", "")
-        return f"https://images.weserv.nl/?url={clean_url}"
-    return url
+    
+    # Om det är en TCGdex-länk, säkerställ rätt format (.png och små bokstäver)
+    if "tcgdex.net" in url:
+        if not url.endswith(".png") and not url.endswith(".jpg") and not url.endswith(".webp"):
+            url = f"{url}/high.png"
+        return url
+        
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            content_type = res.headers.get("content-type", "image/png")
+            b64_str = base64.b64encode(res.content).decode("utf-8")
+            return f"data:{content_type};base64,{b64_str}"
+    except Exception:
+        pass
+        
+    return "https://assets.tcgdex.net/back.png"
 
 # --- CARDMARKET URL GENERATOR ---
 LANG_MAP = {"ENG": 1, "FRA": 2, "GER": 3, "SPA": 4, "ITA": 5, "JPN": 7, "POR": 8, "KOR": 9, "ZHT": 10}
@@ -194,9 +209,9 @@ with tab1:
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * current_rate).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * current_rate).round(2)
         
-        # Tvätta bild-URL:er så att Cardmarket-länkar inte blockeras
+        # Säkerställ att alla bildlänkar fungerar och konverteras till giltigt format
         if "Bild" in df.columns:
-            df["Bild"] = df["Bild"].apply(fix_image_url)
+            df["Bild"] = df["Bild"].apply(get_image_as_base64)
 
         col_act1, col_act2, col_act3 = st.columns([2, 1, 1])
         with col_act1:
@@ -279,7 +294,6 @@ with tab1:
                         v_eur = float(item.get("Värde (EUR)", 0.0) or 0.0)
                         item["Köpt för (SEK)"] = round(k_eur * current_rate, 2)
                         item["Värde idag (SEK)"] = round(v_eur * current_rate, 2)
-                        item["Bild"] = fix_image_url(item.get("Bild", ""))
                     
                     app_data["collection"] = renumber_collection(updated_list)
                     st.session_state["app_data"] = app_data
@@ -322,7 +336,7 @@ with tab2:
                     api_img_url = card_api.get("image_url", "")
 
                     with col_img:
-                        display_img = fix_image_url(api_img_url)
+                        display_img = get_image_as_base64(api_img_url)
                         st.image(display_img, width=120)
 
                     with col_info:
@@ -354,10 +368,9 @@ with tab2:
                                 final_price = varde_eur if varde_eur > 0 else (cm_price if cm_price else 0.0)
                                 
                                 raw_img = custom_img_url.strip() if custom_img_url.strip() else (api_img_url if api_img_url else "")
-                                final_img = fix_image_url(raw_img)
 
                                 new_entry = {
-                                    "Bild": final_img,
+                                    "Bild": raw_img,
                                     "Pärmnummer": int(parm_nr),
                                     "Språk": lang,
                                     "Namn": card_name,
