@@ -1,3 +1,21 @@
 {
-  "collection": []
+  "collection": [
+    {
+      "Bild": "",
+      "Pärmnummer": 1,
+      "Språk": "JPN",
+      "Namn": "アローラライチュウ",
+      "Setnr.": "016",
+      "SetBet.": "SM4A",
+      "Set": "Transdimensional Crimson Impact",
+      "Övrigt": "Normal",
+      "Skick": "NM",
+      "Köpt för (EUR)": 3.33,
+      "Köpt för (SEK)": 38.3,
+      "Värde (EUR)": 0.0,
+      "Värde idag (SEK)": 0.0,
+      "Datum tillagd": "2026-09-01",
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=%E3%82%A2%E3%83%AD%E3%83%BC%E3%83%A9%E3%83%A9%E3%82%A4%E3%83%81%E3%83%A5%E3%82%A6+016&language=7&minCondition=2"
+    }
+  ]
 }
