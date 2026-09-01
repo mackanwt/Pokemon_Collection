@@ -179,7 +179,6 @@ def search_pokemon_cards(query):
     
     query_clean = query.strip().lower()
     
-    # Rensa bort snedstreck och totalantal om användaren söker t.ex. "31/111"
     if "/" in query_clean:
         query_clean = query_clean.split("/")[0].strip()
 
@@ -224,21 +223,16 @@ def search_pokemon_cards(query):
                             img_base = item.get("image", "")
                             img_url = f"{img_base}/high.png" if img_base else ""
 
-                            # Identifiera setkod och fullt setnamn
                             raw_set_code = card_id.split("-")[0].upper() if "-" in card_id else ""
                             
-                            # Standardvärden
                             final_set_code = raw_set_code
                             final_set_name = raw_set_code
 
-                            # Mappa om koden finns i vår uppslagstabell
                             if raw_set_code in SET_INFO_MAP:
-                                # Om språket är engelska tar vi den officiella engelska 3-bokstavskoden (t.ex. CIN)
                                 if lang_code == "ENG":
                                     final_set_code = SET_INFO_MAP[raw_set_code]["code"]
                                     final_set_name = SET_INFO_MAP[raw_set_code]["name"]
                                 else:
-                                    # För t.ex. JPN behåller vi setkod (t.ex. SM4A) men ger fullt namn om det finns
                                     final_set_code = raw_set_code
                                     final_set_name = SET_INFO_MAP[raw_set_code]["name"]
 
@@ -435,14 +429,16 @@ with tab2:
                             with c_b:
                                 rarity = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], index=0)
                                 kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5)
-                                varde_eur = st.number_input("Värde (EUR - Manuellt)", min_value=0.0, value=2.70, step=0.5)
+                                varde_eur = st.number_input("Värde (EUR - Manuellt)", min_value=0.0, value=0.0, step=0.5)
                             
                             custom_img_url = st.text_input("Bild-URL (Klistra in länk om bilden saknas):", value=api_img_url)
 
                             if st.form_submit_button("➕ Lägg till i samlingen", type="primary", use_container_width=True):
                                 cm_url = generate_cardmarket_url(card_name, set_code, number, lang, cond)
                                 cm_price = fetch_cardmarket_price(cm_url)
-                                final_price = varde_eur if varde_eur > 0 else (cm_price if cm_price else 0.0)
+                                
+                                # Prioritera Cardmarket-pris om inget manuellt pris angetts
+                                final_price = varde_eur if varde_eur > 0 else (cm_price if cm_price is not None else 0.0)
                                 
                                 raw_img = custom_img_url.strip() if custom_img_url.strip() else (api_img_url if api_img_url else "")
 
