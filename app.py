@@ -91,7 +91,6 @@ def generate_cardmarket_url(card_name, set_code, number, lang_code="ENG", cond_c
     cond_id = COND_MAP.get(cond_code, 2)
     num_clean = number.split("/")[0].zfill(3) if number.split("/")[0].isdigit() else number
 
-    # Använd fullständigt setnamn om tillgängligt för bättre träffar
     if set_name and set_name != set_code:
         search_str = f"{set_name} {num_clean}"
     else:
@@ -108,7 +107,6 @@ def generate_cardmarket_url(card_name, set_code, number, lang_code="ENG", cond_c
 # --- PRICECHARTING HÄMTNING (UNGRADED) ---
 @st.cache_data(ttl=3600)
 def fetch_pricecharting_ungraded(card_name, set_name, number):
-    """Hämtar Ungraded-priset i USD från PriceCharting."""
     num_clean = number.split("/")[0]
     query = f"{card_name} {set_name} {num_clean}"
     url = f"https://www.pricecharting.com/api/products?q={urllib.parse.quote(query)}"
@@ -120,10 +118,9 @@ def fetch_pricecharting_ungraded(card_name, set_name, number):
             data = res.json()
             products = data.get("products", [])
             if products:
-                # Plocka första/bästa matchningen
                 price_cents = products[0].get("loose-price") or products[0].get("ungraded-price")
                 if price_cents:
-                    return float(price_cents) / 100.0  # Omvandla cents till USD ($)
+                    return float(price_cents) / 100.0
     except Exception:
         pass
     return None
@@ -234,8 +231,8 @@ app_data = st.session_state["app_data"]
 if "collection" not in app_data:
     app_data["collection"] = []
 
-usd_to_sek = 10.5  # Växelkurs USD till SEK
-eur_to_sek = 11.5  # Växelkurs EUR till SEK
+usd_to_sek = 10.5
+eur_to_sek = 11.5
 
 # --- LAYOUT & TABS ---
 tab1, tab2 = st.tabs(["📊 Samling", "➕ Sök & Lägg till kort"])
@@ -250,8 +247,16 @@ with tab1:
     if collection:
         df = pd.DataFrame(collection)
         
-        df["Värde (USD)"] = pd.to_numeric(df.get("Värde (USD)", 0.0), errors='coerce').fillna(0.0)
-        df["Köpt för (EUR)"] = pd.to_numeric(df.get("Köpt för (EUR)", 0.0), errors='coerce').fillna(0.0)
+        # Säkerställ att alla kolumner finns i DataFramen innan konvertering
+        for col in ["Värde (USD)", "Värde (EUR)", "Köpt för (EUR)", "Cardmarket"]:
+            if col not in df.columns:
+                df[col] = 0.0 if "Värde" in col or "Köpt" in col else ""
+        
+        # Om gamla "Värde (EUR)" finns men inte "Värde (USD)", använd det som backup
+        if "Värde (USD)" in df.columns:
+            df["Värde (USD)"] = pd.to_numeric(df["Värde (USD)"], errors='coerce').fillna(0.0)
+        
+        df["Köpt för (EUR)"] = pd.to_numeric(df["Köpt för (EUR)"], errors='coerce').fillna(0.0)
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * eur_to_sek).round(2)
         df["Värde idag (SEK)"] = (df["Värde (USD)"] * usd_to_sek).round(2)
         
@@ -265,7 +270,6 @@ with tab1:
                     updated_count = 0
                     
                     for item in app_data["collection"]:
-                        # Uppdatera Cardmarket-länken för visning
                         cm_url = generate_cardmarket_url(
                             item.get("Namn", ""), 
                             item.get("SetBet.", ""), 
@@ -276,7 +280,6 @@ with tab1:
                         )
                         item["Cardmarket"] = cm_url
 
-                        # Hämtar Ungraded priset i USD
                         pc_price = fetch_pricecharting_ungraded(
                             item.get("Namn", ""),
                             item.get("Set", ""),
