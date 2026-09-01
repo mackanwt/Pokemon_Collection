@@ -1,8 +1,25 @@
 {
   "collection": [
     {
-      "Bild": "",
+      "Bild": "https://assets.tcgdex.net/en/sm/sm4/31/high.png",
       "Pärmnummer": 1,
+      "Språk": "ENG",
+      "Namn": "Alolan Raichu",
+      "Setnr.": "31",
+      "SetBet.": "CIN",
+      "Set": "Crimson Invasion",
+      "Övrigt": "Normal",
+      "Skick": "NM",
+      "Köpt för (EUR)": 0.0,
+      "Köpt för (SEK)": 0.0,
+      "Värde (EUR)": 0.0,
+      "Värde idag (SEK)": 0.0,
+      "Datum tillagd": "2026-09-01",
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=CIN+031&language=1&minCondition=2"
+    },
+    {
+      "Bild": "",
+      "Pärmnummer": 2,
       "Språk": "JPN",
       "Namn": "アローラライチュウ",
       "Setnr.": "016",
