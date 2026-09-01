@@ -66,7 +66,6 @@ def get_image_as_base64(url):
     if not url or not str(url).startswith("http"):
         return "https://assets.tcgdex.net/back.png"
     
-    # Om det är en TCGdex-länk, säkerställ rätt format (.png och små bokstäver)
     if "tcgdex.net" in url:
         if not url.endswith(".png") and not url.endswith(".jpg") and not url.endswith(".webp"):
             url = f"{url}/high.png"
@@ -114,6 +113,64 @@ def fetch_cardmarket_price(url):
         pass
     return None
 
+# --- MAPPNINGSSAMPLING FÖR SETKODER & SETNAMN ---
+SET_INFO_MAP = {
+    # Sun & Moon (Engelska)
+    "SM1": {"code": "SUM", "name": "Sun & Moon Base"},
+    "SM2": {"code": "GRI", "name": "Guardians Rising"},
+    "SM3": {"code": "BUS", "name": "Burning Shadows"},
+    "SM3.5": {"code": "SLG", "name": "Shining Legends"},
+    "SM4": {"code": "CIN", "name": "Crimson Invasion"},
+    "SM5": {"code": "UPR", "name": "Ultra Prism"},
+    "SM6": {"code": "FLI", "name": "Forbidden Light"},
+    "SM7": {"code": "CES", "name": "Celestial Storm"},
+    "SM7.5": {"code": "DRM", "name": "Dragon Majesty"},
+    "SM8": {"code": "LOT", "name": "Lost Thunder"},
+    "SM9": {"code": "TEU", "name": "Team Up"},
+    "SM10": {"code": "UNB", "name": "Unbroken Bonds"},
+    "SM11": {"code": "UNM", "name": "Unified Minds"},
+    "SM11.5": {"code": "HIF", "name": "Hidden Fates"},
+    "SM12": {"code": "CEC", "name": "Cosmic Eclipse"},
+    
+    # Sword & Shield (Engelska)
+    "SWSH1": {"code": "SSH", "name": "Sword & Shield Base"},
+    "SWSH2": {"code": "RCL", "name": "Rebel Clash"},
+    "SWSH3": {"code": "DAA", "name": "Darkness Ablaze"},
+    "SWSH3.5": {"code": "CPA", "name": "Champions Path"},
+    "SWSH4": {"code": "VIV", "name": "Vivid Voltage"},
+    "SWSH4.5": {"code": "SHF", "name": "Shining Fates"},
+    "SWSH5": {"code": "BST", "name": "Battle Styles"},
+    "SWSH6": {"code": "CRE", "name": "Chilling Reign"},
+    "SWSH7": {"code": "EVS", "name": "Evolving Skies"},
+    "SWSH8": {"code": "FST", "name": "Fusion Strike"},
+    "SWSH9": {"code": "BRS", "name": "Brilliant Stars"},
+    "SWSH10": {"code": "ASR", "name": "Astral Radiance"},
+    "SWSH10.5": {"code": "PGO", "name": "Pokémon GO"},
+    "SWSH11": {"code": "LOR", "name": "Lost Origin"},
+    "SWSH12": {"code": "SIT", "name": "Silver Tempest"},
+    "SWSH12.5": {"code": "CRZ", "name": "Crown Zenith"},
+
+    # Scarlet & Violet (Engelska)
+    "SV1": {"code": "SVI", "name": "Scarlet & Violet Base"},
+    "SV2": {"code": "PAL", "name": "Paldea Evolved"},
+    "SV3": {"code": "OBF", "name": "Obsidian Flames"},
+    "SV3.5": {"code": "MEW", "name": "151"},
+    "SV4": {"code": "PAR", "name": "Paradox Rift"},
+    "SV4.5": {"code": "PAF", "name": "Paldean Fates"},
+    "SV5": {"code": "TEF", "name": "Temporal Forces"},
+    "SV6": {"code": "TWM", "name": "Twilight Masquerade"},
+    "SV6.5": {"code": "SFA", "name": "Shrouded Fable"},
+    "SV7": {"code": "SCR", "name": "Stellar Crown"},
+    "SV8": {"code": "SSP", "name": "Surging Sparks"},
+    "SV8.5": {"code": "PRE", "name": "Prismatic Evolutions"},
+
+    # Japanska Era-Set (Exempel)
+    "SM4A": {"code": "SM4A", "name": "Transdimensional Crimson Impact"},
+    "SM4S": {"code": "SM4S", "name": "Ultradimensional Beasts"},
+    "S8A": {"code": "S8A", "name": "25th Anniversary Collection"},
+    "SV2A": {"code": "SV2A", "name": "Pokémon Card 151"}
+}
+
 # --- SÖKFUNKTION ---
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
@@ -121,7 +178,12 @@ def search_pokemon_cards(query):
         return []
     
     query_clean = query.strip().lower()
-    search_words = [w for w in re.split(r'[\s/]+', query_clean) if w]
+    
+    # Rensa bort snedstreck och totalantal om användaren söker t.ex. "31/111"
+    if "/" in query_clean:
+        query_clean = query_clean.split("/")[0].strip()
+
+    search_words = [w for w in re.split(r'\s+', query_clean) if w]
     headers = {'User-Agent': 'Mozilla/5.0'}
     results = []
     seen_ids = set()
@@ -162,12 +224,28 @@ def search_pokemon_cards(query):
                             img_base = item.get("image", "")
                             img_url = f"{img_base}/high.png" if img_base else ""
 
-                            set_code = card_id.split("-")[0].upper() if "-" in card_id else ""
+                            # Identifiera setkod och fullt setnamn
+                            raw_set_code = card_id.split("-")[0].upper() if "-" in card_id else ""
                             
+                            # Standardvärden
+                            final_set_code = raw_set_code
+                            final_set_name = raw_set_code
+
+                            # Mappa om koden finns i vår uppslagstabell
+                            if raw_set_code in SET_INFO_MAP:
+                                # Om språket är engelska tar vi den officiella engelska 3-bokstavskoden (t.ex. CIN)
+                                if lang_code == "ENG":
+                                    final_set_code = SET_INFO_MAP[raw_set_code]["code"]
+                                    final_set_name = SET_INFO_MAP[raw_set_code]["name"]
+                                else:
+                                    # För t.ex. JPN behåller vi setkod (t.ex. SM4A) men ger fullt namn om det finns
+                                    final_set_code = raw_set_code
+                                    final_set_name = SET_INFO_MAP[raw_set_code]["name"]
+
                             results.append({
                                 "id": unique_key,
                                 "name": item.get("name", ""),
-                                "set": {"name": set_code, "ptcgoCode": set_code},
+                                "set": {"name": final_set_name, "ptcgoCode": final_set_code},
                                 "number": c_local,
                                 "image_url": img_url,
                                 "default_lang": lang_code
@@ -209,7 +287,6 @@ with tab1:
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * current_rate).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * current_rate).round(2)
         
-        # Säkerställ att alla bildlänkar fungerar och konverteras till giltigt format
         if "Bild" in df.columns:
             df["Bild"] = df["Bild"].apply(get_image_as_base64)
 
