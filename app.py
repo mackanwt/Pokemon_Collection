@@ -78,7 +78,7 @@ def save_data_to_github(data_dict):
     if put_res.status_code in [200, 201]:
         return True, "Sparat!"
     else:
-        return False, f"GitHub felkode {put_res.status_code}: {put_res.text}"
+        return False, f"GitHub felkod {put_res.status_code}: {put_res.text}"
 
 def renumber_collection(collection_list):
     sorted_list = sorted(collection_list, key=lambda x: int(x.get("Pärmnummer", 0) or 0))
@@ -109,8 +109,10 @@ def get_image_as_base64(url):
     return "https://assets.tcgdex.net/back.png"
 
 def generate_google_cardmarket_url(name, number, set_name):
-    clean_name = re.sub(r'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9faf]', '', name).strip()
-    query = f"{clean_name} {number} {set_name} cardmarket"
+    # Säkra mot None-värden som orsakade TypeError
+    safe_name = str(name) if name is not None else ""
+    clean_name = re.sub(r'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9faf]', '', safe_name).strip()
+    query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
 @st.cache_data(ttl=3600)
@@ -274,13 +276,13 @@ with tab1:
             column_config_edit = {
                 "Bild": st.column_config.TextColumn("Bild-URL", width="medium"),
                 "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
-                "Språk": st.column_config.TextColumn("Språk", width="small"),
+                "Språk": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width="small"),
                 "Namn": st.column_config.TextColumn("Namn", width="medium"),
                 "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
                 "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
                 "Set": st.column_config.TextColumn("Set/Base", width="medium"),
-                "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
-                "Skick": st.column_config.TextColumn("Skick", width="small"),
+                "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], width="small"),
+                "Skick": st.column_config.SelectboxColumn("Skick", options=["NM", "EX", "GD", "LP", "PL", "PO"], width="small"),
                 "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
                 "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width="small"),
                 "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width="small", disabled=True),
@@ -305,7 +307,7 @@ with tab1:
                         item["Köpt för (SEK)"] = round(k_eur * eur_to_sek, 2)
                         item["Värde idag (SEK)"] = round(v_eur * eur_to_sek, 2)
                         
-                        s_name = item.get("Engelskt Namn") or item.get("Namn", "")
+                        s_name = item.get("Engelskt Namn") or item.get("Namn") or ""
                         item["Google Sök"] = generate_google_cardmarket_url(s_name, item.get("Setnr.", ""), item.get("Set", ""))
 
                     app_data["collection"] = renumber_collection(updated_list)
