@@ -11,14 +11,13 @@
       "Övrigt": "Holo",
       "Skick": "NM",
       "Köpt för (EUR)": 0.0,
-      "Köpt för (SEK)": 0.0,
       "Värde (EUR)": 0.0,
       "Värde idag (SEK)": 0.0,
-      "Datum tillagd": "2026-09-01",
-      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=CIN+031&language=1&minCondition=2"
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=CIN+031&language=1&minCondition=2",
+      "Köpt för (SEK)": 0.0
     },
     {
-      "Bild": "",
+      "Bild": "https://assets.tcgdex.net/back.png",
       "Pärmnummer": 2,
       "Språk": "JPN",
       "Namn": "アローラライチュウ",
@@ -28,11 +27,10 @@
       "Övrigt": "Holo",
       "Skick": "NM",
       "Köpt för (EUR)": 0.0,
-      "Köpt för (SEK)": 0.0,
       "Värde (EUR)": 0.0,
       "Värde idag (SEK)": 0.0,
-      "Datum tillagd": "2026-09-01",
-      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=SM4A+016&language=7&minCondition=2"
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=SM4A+016&language=7&minCondition=2",
+      "Köpt för (SEK)": 0.0
     }
   ]
 }
