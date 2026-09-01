@@ -1,7 +1,7 @@
 {
   "collection": [
     {
-      "Bild": "https://assets.tcgdex.net/ja/SM4A/016/high.png",
+      "Bild": "https://product-images.s3.cardmarket.com/51/sm4a/560261/560261.jpg",
       "Pärmnummer": 1,
       "Språk": "JPN",
       "Namn": "アローラライチュウ",
@@ -11,11 +11,10 @@
       "Övrigt": "Holo",
       "Skick": "NM",
       "Köpt för (EUR)": 3.33,
-      "Köpt för (SEK)": 38.3,
       "Värde (EUR)": 2.7,
       "Värde idag (SEK)": 31.05,
-      "Datum tillagd": "2026-08-31",
-      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=SM4A+016&language=7&minCondition=2"
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=SM4A+016&language=7&minCondition=2",
+      "Köpt för (SEK)": 38.3
     }
   ]
 }
