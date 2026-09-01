@@ -1,38 +1,3 @@
 {
-  "collection": [
-    {
-      "Bild": "https://assets.tcgdex.net/en/sm/sm4/31/high.png",
-      "Pärmnummer": 1,
-      "Språk": "ENG",
-      "Namn": "Alolan Raichu",
-      "Setnr.": "31",
-      "SetBet.": "SM4",
-      "Set": "SM4",
-      "Övrigt": "Holo",
-      "Skick": "NM",
-      "Köpt för (EUR)": 0.0,
-      "Köpt för (SEK)": 0.0,
-      "Värde (EUR)": 2.7,
-      "Värde idag (SEK)": 31.05,
-      "Datum tillagd": "2026-09-01",
-      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=SM4+031&language=1&minCondition=2"
-    },
-    {
-      "Bild": "https://tcgplayer-cdn.tcgplayer.com/product/572012_in_1000x1000.jpg",
-      "Pärmnummer": 2,
-      "Språk": "JPN",
-      "Namn": "アローラライチュウ",
-      "Setnr.": "016",
-      "SetBet.": "SM4A",
-      "Set": "SM4A",
-      "Övrigt": "Normal",
-      "Skick": "NM",
-      "Köpt för (EUR)": 3.33,
-      "Köpt för (SEK)": 38.3,
-      "Värde (EUR)": 2.7,
-      "Värde idag (SEK)": 31.05,
-      "Datum tillagd": "2026-09-01",
-      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=SM4A+016&language=7&minCondition=2"
-    }
-  ]
+  "collection": []
 }
