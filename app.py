@@ -335,7 +335,7 @@ with tab1:
         else:
             column_config_edit = {
                 "Bild": st.column_config.TextColumn("Bild-URL", width="medium"),
-                "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
+                "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small", step=1),
                 "Språk": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width="small"),
                 "Namn": st.column_config.TextColumn("Namn", width="medium"),
                 "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
@@ -355,12 +355,17 @@ with tab1:
                 column_config=column_config_edit,
                 use_container_width=True,
                 hide_index=True,
-                num_rows="dynamic"
+                num_rows="dynamic",
+                key="collection_editor"
             )
 
             with col_act2:
                 if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
                     updated_list = edited_df.to_dict(orient="records")
+                    
+                    # Sortera baserat på det manuellt inmatade pärmnumret
+                    updated_list = sorted(updated_list, key=lambda x: int(x.get("Pärmnummer", 0) or 0))
+                    
                     for item in updated_list:
                         k_eur = float(item.get("Köpt för (EUR)", 0.0) or 0.0)
                         v_eur = float(item.get("Värde (EUR)", 0.0) or 0.0)
@@ -370,12 +375,13 @@ with tab1:
                         s_name = item.get("Engelskt Namn") or item.get("Namn") or ""
                         item["Google Sök"] = generate_google_cardmarket_url(s_name, item.get("Setnr.", ""), item.get("Set", ""))
 
+                    # Renumrera sekventiellt (1, 2, 3...) efter den nya sorteringen
                     app_data["collection"] = renumber_collection(updated_list)
                     st.session_state["app_data"] = app_data
                     
                     success, msg = save_data_to_github(app_data)
                     if success:
-                        st.success("Ändringarna sparades till GitHub!")
+                        st.success("Ändringarna sparades och renumrerades!")
                         st.rerun()
                     else:
                         st.error(f"Kunde inte spara till GitHub: {msg}")
