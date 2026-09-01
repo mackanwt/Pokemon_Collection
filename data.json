@@ -1,8 +1,27 @@
 {
   "collection": [
     {
-      "Bild": "",
+      "Bild": "https://assets.tcgdex.net/en/sm/sm4/31/high.png",
       "Pärmnummer": 1,
+      "Språk": "ENG",
+      "Namn": "Alolan Raichu",
+      "Engelskt Namn": "Alolan Raichu",
+      "Setnr.": "31",
+      "SetBet.": "SM4",
+      "Set": "SM4",
+      "Övrigt": "Normal",
+      "Skick": "NM",
+      "Köpt för (EUR)": 0.0,
+      "Köpt för (SEK)": 0.0,
+      "Värde (EUR)": 0.0,
+      "Värde idag (SEK)": 0.0,
+      "Datum tillagd": "2026-09-01",
+      "Google Sök": "https://www.google.com/search?q=Alolan%20Raichu%2031%20SM4%20cardmarket",
+      "Egen Cardmarket Länk": ""
+    },
+    {
+      "Bild": "",
+      "Pärmnummer": 2,
       "Språk": "JPN",
       "Namn": "アローラライチュウ",
       "Engelskt Namn": "アローラライチュウ",
