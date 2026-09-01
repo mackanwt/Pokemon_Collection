@@ -6,6 +6,7 @@ import requests
 from datetime import date
 import urllib.parse
 import re
+import uuid
 
 # --- 0. PAGE-KONFIGURATION ---
 st.set_page_config(
@@ -117,8 +118,12 @@ def save_data_to_github(data_dict):
     else:
         return False, f"GitHub felkod {put_res.status_code}: {put_res.text}"
 
-def fix_existing_collection_sets(collection_list):
-    for card in collection_list:
+def fix_existing_collection(collection_list):
+    """Säkerställer unika ID:n, giltiga bildlänkar och korrekta setnamn"""
+    for idx, card in enumerate(collection_list):
+        if "_id" not in card or not card["_id"]:
+            card["_id"] = str(uuid.uuid4())
+            
         current_set = str(card.get("Set") or "").strip()
         set_bet = str(card.get("SetBet.") or "").strip()
         
@@ -128,28 +133,6 @@ def fix_existing_collection_sets(collection_list):
                 card["Set"] = real_name
                 card["SetBet."] = real_bet
     return collection_list
-
-@st.cache_data(ttl=3600)
-def get_image_as_base64(url):
-    if not url or not str(url).startswith("http"):
-        return "https://assets.tcgdex.net/back.png"
-    
-    if "tcgdex.net" in url:
-        if not url.endswith(".png") and not url.endswith(".jpg") and not url.endswith(".webp"):
-            url = f"{url}/high.png"
-        return url
-        
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            content_type = res.headers.get("content-type", "image/png")
-            b64_str = base64.b64encode(res.content).decode("utf-8")
-            return f"data:{content_type};base64,{b64_str}"
-    except Exception:
-        pass
-        
-    return "https://assets.tcgdex.net/back.png"
 
 def generate_google_cardmarket_url(name, number, set_name):
     safe_name = str(name) if name is not None else ""
@@ -248,7 +231,7 @@ app_data = st.session_state["app_data"]
 if "collection" not in app_data:
     app_data["collection"] = []
 
-app_data["collection"] = fix_existing_collection_sets(app_data["collection"])
+app_data["collection"] = fix_existing_collection(app_data["collection"])
 
 eur_to_sek = fetch_eur_to_sek_rate()
 
@@ -271,6 +254,7 @@ with tab1:
                 fetch_eur_to_sek_rate.clear()
                 st.rerun()
 
+    # Sortera alltid på Pärmnummer i grunddata
     collection = sorted(app_data.get("collection", []), key=lambda x: int(x.get("Pärmnummer", 0) or 0))
     app_data["collection"] = collection
     
@@ -280,12 +264,11 @@ with tab1:
         if "Värde (USD)" in df.columns and "Värde (EUR)" not in df.columns:
             df["Värde (EUR)"] = df["Värde (USD)"]
         
-        # Säkerställ att Bild-kolumnen alltid har kvar sin URL
-        for col in ["Bild", "Värde (EUR)", "Köpt för (EUR)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn"]:
+        for col in ["Bild", "Pärmnummer", "Värde (EUR)", "Köpt för (EUR)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn", "_id"]:
             if col not in df.columns:
                 df[col] = 0.0 if "Värde" in col or "Köpt" in col else ""
         
-        df["Bild"] = df["Bild"].fillna("")
+        df["Bild"] = df["Bild"].fillna("").astype(str)
         df["Värde (EUR)"] = pd.to_numeric(df["Värde (EUR)"], errors='coerce').fillna(0.0)
         df["Köpt för (EUR)"] = pd.to_numeric(df["Köpt för (EUR)"], errors='coerce').fillna(0.0)
         
@@ -303,8 +286,6 @@ with tab1:
 
         if not edit_mode:
             display_df = df.copy()
-            if "Bild" in display_df.columns:
-                display_df["Bild"] = display_df["Bild"].apply(get_image_as_base64)
 
             column_config = {
                 "Bild": st.column_config.ImageColumn("Bild", width="small"),
@@ -326,6 +307,7 @@ with tab1:
         
         else:
             column_config_edit = {
+                "_id": None, # Dölj ID-fältet från redigeraren
                 "Bild": st.column_config.TextColumn("Bild-URL", width="medium"),
                 "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small", step=1),
                 "Språk": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width="small"),
@@ -342,8 +324,11 @@ with tab1:
                 "Egen Cardmarket Länk": st.column_config.TextColumn("Klistra in Cardmarket URL här", width="large")
             }
 
+            # Inkludera _id i df för redigeraren så vi behåller spårbarhet
+            edit_columns = ["_id"] + columns_order
+
             edited_df = st.data_editor(
-                df[columns_order],
+                df[edit_columns],
                 column_config=column_config_edit,
                 use_container_width=True,
                 hide_index=True,
@@ -355,22 +340,24 @@ with tab1:
                 if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
                     raw_edited = edited_df.to_dict(orient="records")
                     
+                    # 1. Sortera raderna baserat på det nya inmatade Pärmnumret
+                    # Om två kort har samma siffra behålls den inbördes ordningen
                     for idx, row in enumerate(raw_edited):
-                        row["_tmp_parm"] = float(row.get("Pärmnummer", 0) or 0)
-                        row["_tmp_idx"] = idx
+                        try:
+                            row["_target_parm"] = float(row.get("Pärmnummer", 0) or 0)
+                        except (ValueError, TypeError):
+                            row["_target_parm"] = 0.0
+                        row["_orig_order"] = idx
 
-                    sorted_rows = sorted(raw_edited, key=lambda x: (x["_tmp_parm"], x["_tmp_idx"]))
+                    sorted_edited = sorted(raw_edited, key=lambda x: (x["_target_parm"], x["_orig_order"]))
 
+                    # 2. Uppdatera alla fält och tilldela sekventiella Pärmnummer (1, 2, 3...)
                     final_list = []
-                    for new_pärmnr, row in enumerate(sorted_rows, start=1):
-                        row["Pärmnummer"] = new_pärmnr
-                        row.pop("_tmp_parm", None)
-                        row.pop("_tmp_idx", None)
-                        
-                        # Bevara befintliga bild-URLer om redigeraren gav tomma strängar
-                        if not row.get("Bild") and idx < len(collection):
-                            row["Bild"] = collection[idx].get("Bild", "")
-                        
+                    for seq_nr, row in enumerate(sorted_edited, start=1):
+                        row["Pärmnummer"] = seq_nr
+                        row.pop("_target_parm", None)
+                        row.pop("_orig_order", None)
+
                         k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
                         v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
                         row["Köpt för (SEK)"] = round(k_eur * eur_to_sek, 2)
@@ -427,8 +414,10 @@ with tab2:
                     api_img_url = str(card_api.get("image_url") or "")
 
                     with col_img:
-                        display_img = get_image_as_base64(api_img_url)
-                        st.image(display_img, width=120)
+                        if api_img_url:
+                            st.image(api_img_url, width=120)
+                        else:
+                            st.image("https://assets.tcgdex.net/back.png", width=120)
 
                     with col_info:
                         st.markdown(f"### {card_name}")
@@ -464,6 +453,7 @@ with tab2:
                                 raw_img = custom_img_url.strip() if custom_img_url.strip() else (api_img_url if api_img_url else "")
 
                                 new_entry = {
+                                    "_id": str(uuid.uuid4()),
                                     "Bild": raw_img,
                                     "Pärmnummer": int(parm_nr),
                                     "Språk": lang,
