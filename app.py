@@ -68,10 +68,7 @@ def generate_cardmarket_url(card_name, set_code, number, lang_code="JPN", cond_c
     lang_id = LANG_MAP.get(lang_code, 7)
     cond_id = COND_MAP.get(cond_code, 2)
     
-    # Rensa nummer
     num_clean = number.split("/")[0].zfill(3) if number.split("/")[0].isdigit() else number
-    
-    # Skapa en extremt träffsäker Cardmarket-sökning som inte kraschar
     search_str = f"{set_code} {num_clean}"
     base_url = "https://www.cardmarket.com/en/Pokemon/Products/Search"
     params = {
@@ -82,7 +79,6 @@ def generate_cardmarket_url(card_name, set_code, number, lang_code="JPN", cond_c
     return f"{base_url}?{urllib.parse.urlencode(params)}"
 
 def fetch_cardmarket_price(url):
-    """Försöker scrapa 30-dagars snittpris från Cardmarket"""
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
         res = requests.get(url, headers=headers, timeout=4)
@@ -101,7 +97,7 @@ def search_pokemon_cards(query):
         return []
     
     query_clean = query.strip().lower()
-    search_words = re.split(r'[\s/]+', query_clean)
+    search_words = [w for w in re.split(r'[\s/]+', query_clean) if w]
     headers = {'User-Agent': 'Mozilla/5.0'}
     results = []
     seen_ids = set()
@@ -123,10 +119,14 @@ def search_pokemon_cards(query):
                     c_name = str(item.get("name", "")).lower()
                     c_local = str(item.get("localId", "")).lower()
                     
-                    matches_all = all(
-                        (w in c_id or w in c_name or w == c_local or w.lstrip("0") == c_local.lstrip("0")) 
-                        for w in search_words if w
-                    )
+                    matches_all = True
+                    for w in search_words:
+                        in_id = w in c_id
+                        in_name = w in c_name
+                        in_local = (w == c_local) or (w.lstrip("0") == c_local.lstrip("0"))
+                        if not (in_id or in_name or in_local):
+                            matches_all = False
+                            break
                     
                     if matches_all:
                         card_id = item.get("id", "")
@@ -135,13 +135,11 @@ def search_pokemon_cards(query):
                         if unique_key not in seen_ids:
                             seen_ids.add(unique_key)
                             
-                            # Bild-URL generering med fallback
                             img_base = item.get("image", "")
                             if img_base:
                                 img_url = f"{img_base}/high.png"
                             else:
-                                # Skapa direktlänk till TCGdex tillgångar
-                                img_url = f"https://assets.tcgdex.net/{lang_key}/{card_id.replace('-', '/')}/high.png"
+                                img_url = "https://assets.tcgdex.net/back.png"
 
                             set_code = card_id.split("-")[0].upper() if "-" in card_id else ""
                             
@@ -190,8 +188,8 @@ with tab1:
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * current_rate).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * current_rate).round(2)
         
-        # Säkerställ bild fallback i tabellen
-        df["Bild"] = df["Bild"].apply(lambda x: x if x else "https://assets.tcgdex.net/back.png")
+        if "Bild" in df.columns:
+            df["Bild"] = df["Bild"].apply(lambda x: x if x else "https://assets.tcgdex.net/back.png")
 
         col_actions1, col_actions2 = st.columns([2, 1])
         with col_actions1:
@@ -202,7 +200,6 @@ with tab1:
                         cm_url = item.get("Cardmarket", "")
                         if cm_url:
                             fetched_price = fetch_cardmarket_price(cm_url)
-                            # Behåll befintligt värde om inget nytt hittas
                             if fetched_price is not None:
                                 item["Värde (EUR)"] = fetched_price
                                 item["Värde idag (SEK)"] = round(fetched_price * current_rate, 2)
@@ -210,7 +207,7 @@ with tab1:
                                 
                     st.session_state["app_data"] = app_data
                     save_data_to_github(app_data)
-                    st.success(f"Uppdaterade priser för {updated_count} kort! (Manuella värden behölls där inga nya hittades).")
+                    st.success(f"Uppdaterade priser för {updated_count} kort!")
                     st.rerun()
 
         with st.expander("🛠️ Hantera / Radera enskilt kort", expanded=False):
@@ -264,7 +261,7 @@ with tab1:
 with tab2:
     st.subheader("🔍 Sök på Namn, Nummer eller Setkod")
     
-    search_query = st.text_input("Sök t.ex. 'sm4a 016' eller 'Alolan Raichu':", key="card_search_input")
+    search_query = st.text_input("Sök t.ex. 'sm4a 016' eller 'Raichu':", key="card_search_input")
     
     if search_query:
         with st.spinner("Söker kort..."):
@@ -286,7 +283,7 @@ with tab2:
                     img_url = card_api.get("image_url", "")
 
                     with col_img:
-                        st.image(img_url if img_url else "https://assets.tcgdex.net/back.png", width=120)
+                        st.image(img_url, width=120)
 
                     with col_info:
                         st.markdown(f"### {card_name}")
@@ -311,8 +308,6 @@ with tab2:
 
                             if st.form_submit_button("➕ Lägg till i samlingen", type="primary", use_container_width=True):
                                 cm_url = generate_cardmarket_url(card_name, set_code, number, lang, cond)
-                                
-                                # Försök hämta 30-dagars snittpris om användaren inte angett ett eget manuellt värde
                                 cm_price = fetch_cardmarket_price(cm_url)
                                 final_price = varde_eur if varde_eur > 0 else (cm_price if cm_price else 0.0)
 
