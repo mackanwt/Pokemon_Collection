@@ -58,7 +58,6 @@ def save_data_to_github(data_dict):
         "Accept": "application/vnd.github.v3+json"
     }
     
-    # Hämta sha från befintlig fil
     sha = None
     res = requests.get(url, headers=headers)
     if res.status_code == 200:
@@ -109,11 +108,27 @@ def get_image_as_base64(url):
     return "https://assets.tcgdex.net/back.png"
 
 def generate_google_cardmarket_url(name, number, set_name):
-    # Säkra mot None-värden som orsakade TypeError
     safe_name = str(name) if name is not None else ""
     clean_name = re.sub(r'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9faf]', '', safe_name).strip()
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+
+@st.cache_data(ttl=3600)
+def get_set_details(set_id, lang="en"):
+    """Hämtar riktigt setnamn och förkortning (t.ex. Crimson Invasion & CIN)"""
+    if not set_id:
+        return "", ""
+    try:
+        url = f"https://api.tcgdex.net/v2/{lang}/sets/{set_id}"
+        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
+        if res.status_code == 200:
+            data = res.json()
+            set_name = data.get("name", "")
+            set_abbrev = data.get("abbreviation", "") or data.get("id", "").upper()
+            return set_name, set_abbrev
+    except Exception:
+        pass
+    return set_id.upper(), set_id.upper()
 
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
@@ -172,14 +187,19 @@ def search_pokemon_cards(query):
                             seen_ids.add(unique_key)
                             img_base = item.get("image", "")
                             img_url = f"{img_base}/high.png" if img_base else ""
-                            raw_set_code = card_id.split("-")[0].upper() if "-" in card_id else ""
+                            
+                            # Hämta set-information
+                            raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
+                            full_set_name, set_code = get_set_details(raw_set_id, lang_key)
+                            
                             eng_name = eng_cards_map.get(card_id, item.get("name", ""))
 
                             results.append({
                                 "id": unique_key,
                                 "name": item.get("name", ""),
                                 "eng_name": eng_name,
-                                "set_code": raw_set_code,
+                                "set_code": set_code,
+                                "set_name": full_set_name,
                                 "number": c_local,
                                 "image_url": img_url,
                                 "default_lang": lang_code
@@ -231,7 +251,7 @@ with tab1:
         if "Värde (USD)" in df.columns and "Värde (EUR)" not in df.columns:
             df["Värde (EUR)"] = df["Värde (USD)"]
         
-        for col in ["Värde (EUR)", "Köpt för (EUR)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn"]:
+        for col in ["Värde (EUR)", "Köpt för (EUR)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn", "Bild"]:
             if col not in df.columns:
                 df[col] = 0.0 if "Värde" in col or "Köpt" in col else ""
         
@@ -240,9 +260,6 @@ with tab1:
         
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * eur_to_sek).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * eur_to_sek).round(2)
-        
-        if "Bild" in df.columns:
-            df["Bild"] = df["Bild"].apply(get_image_as_base64)
 
         col_act1, col_act2 = st.columns([3, 1])
         with col_act1:
@@ -254,6 +271,10 @@ with tab1:
         ]
 
         if not edit_mode:
+            display_df = df.copy()
+            if "Bild" in display_df.columns:
+                display_df["Bild"] = display_df["Bild"].apply(get_image_as_base64)
+
             column_config = {
                 "Bild": st.column_config.ImageColumn("Bild", width="small"),
                 "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
@@ -270,7 +291,7 @@ with tab1:
                 "Google Sök": st.column_config.LinkColumn("Sök Cardmarket", display_text="🔍 Google Sök", width="medium"),
                 "Egen Cardmarket Länk": st.column_config.LinkColumn("Min Cardmarket Länk", display_text="🔗 Öppna Sida", width="medium")
             }
-            st.dataframe(df[columns_order], column_config=column_config, use_container_width=True, hide_index=True)
+            st.dataframe(display_df[columns_order], column_config=column_config, use_container_width=True, hide_index=True)
         
         else:
             column_config_edit = {
@@ -348,6 +369,7 @@ with tab2:
                     card_name = card_api.get("name", "")
                     eng_name = card_api.get("eng_name", card_name)
                     set_code = card_api.get("set_code", "").upper()
+                    full_set_name = card_api.get("set_name", set_code)
                     number = card_api.get("number", "")
                     def_lang = card_api.get("default_lang", "ENG")
                     api_img_url = card_api.get("image_url", "")
@@ -360,6 +382,7 @@ with tab2:
                         st.markdown(f"### {card_name}")
                         st.write(f"**Språk:** `{def_lang}`")
                         st.write(f"**Setkod:** `{set_code}`")
+                        st.write(f"**Set:** `{full_set_name}`")
                         st.write(f"**Setnr:** {number}")
 
                     with col_form:
@@ -372,7 +395,7 @@ with tab2:
                                 lang = st.selectbox("Språk", all_langs, index=default_lang_idx)
                                 cond = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"], index=0)
                                 parm_nr = st.number_input("Pärmnummer", min_value=1, value=len(app_data.get("collection", [])) + 1)
-                                set_base_input = st.text_input("Set / Base-namn", value=set_code)
+                                set_base_input = st.text_input("Set / Base-namn", value=full_set_name)
 
                             with c_b:
                                 rarity = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], index=0)
