@@ -30,6 +30,46 @@ def fetch_eur_to_sek_rate():
         pass
     return 11.50
 
+# --- FAST MAPPING FÖR ASIATISKA SETS ---
+JAPANESE_SET_MAP = {
+    "sm4a": ("Ultradimensional Beasts", "SM4A"),
+    "sm4b": ("GX Battle Boost", "SM4B"),
+    "sm4+": ("GX Battle Boost", "SM4+"),
+    "sm4": ("Crimson Invasion", "CIN"),
+    "sm4s": ("Awakened Heroes", "SM4S"),
+    "sm4m": ("Transdimensional Ultra Beasts", "SM4M"),
+    "sm8b": ("Ultra Shiny GX", "SM8B"),
+    "sm12a": ("Tag All Stars", "SM12A"),
+    "s12a": ("VSTAR Universe", "S12A"),
+    "sv4a": ("Shiny Treasure ex", "SV4A"),
+}
+
+def get_set_details_sync(set_id):
+    """Direkt-uppslag för setnamn utan caching-fördröjning"""
+    if not set_id:
+        return "", ""
+    
+    clean_id = str(set_id).lower().strip()
+    
+    # 1. Tvinga användning av manuell mappning för alla kända japanska set
+    if clean_id in JAPANESE_SET_MAP:
+        return JAPANESE_SET_MAP[clean_id]
+        
+    # 2. Försök med TCGdex engelska API
+    try:
+        url = f"https://api.tcgdex.net/v2/en/sets/{clean_id}"
+        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=2)
+        if res.status_code == 200:
+            data = res.json()
+            set_name = data.get("name", "")
+            set_abbrev = data.get("abbreviation", "") or data.get("id", "").upper()
+            if set_name and set_name.lower() != clean_id:
+                return set_name, set_abbrev
+    except Exception:
+        pass
+        
+    return clean_id.upper(), clean_id.upper()
+
 # --- GITHUB CONFIG & INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
@@ -85,6 +125,20 @@ def renumber_collection(collection_list):
         card["Pärmnummer"] = idx
     return sorted_list
 
+def fix_existing_collection_sets(collection_list):
+    """Rensar gamla felaktiga setnamn i den sparade samlingen"""
+    for card in collection_list:
+        current_set = str(card.get("Set", "")).strip()
+        set_bet = str(card.get("SetBet.", "")).strip()
+        
+        # Om Set är samma som SetBet (t.ex. SM4A) eller finns i vår lista
+        if current_set.lower() in JAPANESE_SET_MAP or current_set.lower() == set_bet.lower():
+            real_name, real_bet = get_set_details_sync(current_set or set_bet)
+            if real_name and real_name != current_set:
+                card["Set"] = real_name
+                card["SetBet."] = real_bet
+    return collection_list
+
 @st.cache_data(ttl=3600)
 def get_image_as_base64(url):
     if not url or not str(url).startswith("http"):
@@ -113,43 +167,6 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
-# Mappningstabell för japanska/internationella set-ID:n som saknas i engelska TCGdex API:et
-JAPANESE_SET_MAP = {
-    "sm4a": ("Ultradimensional Beasts", "SM4A"),
-    "sm4b": ("GX Battle Boost", "SM4B"),
-    "sm4+": ("GX Battle Boost", "SM4+"),
-    "sm4": ("Crimson Invasion", "CIN"),
-    "sm4s": ("Awakened Heroes", "SM4S"),
-    "sm4m": ("Transdimensional Ultra Beasts", "SM4M"),
-}
-
-@st.cache_data(ttl=3600)
-def get_set_details(set_id):
-    """Hämtar engelskt setnamn och förkortning med fallback-mappning för asiatiska sets"""
-    if not set_id:
-        return "", ""
-    
-    clean_id = set_id.lower().strip()
-    
-    # 1. Kolla först manuell mappning för asiatiska/speciella set-koder
-    if clean_id in JAPANESE_SET_MAP:
-        return JAPANESE_SET_MAP[clean_id]
-        
-    # 2. Försök annars hämta via TCGdex engelska API
-    try:
-        url = f"https://api.tcgdex.net/v2/en/sets/{clean_id}"
-        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
-        if res.status_code == 200:
-            data = res.json()
-            set_name = data.get("name", "")
-            set_abbrev = data.get("abbreviation", "") or data.get("id", "").upper()
-            if set_name and set_name.lower() != clean_id:
-                return set_name, set_abbrev
-    except Exception:
-        pass
-        
-    return clean_id.upper(), clean_id.upper()
-
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
     if not query:
@@ -171,7 +188,7 @@ def search_pokemon_cards(query):
 
     eng_cards_map = {}
     try:
-        res_eng = requests.get("https://api.tcgdex.net/v2/en/cards", headers=headers, timeout=4)
+        res_eng = requests.get("https://api.tcgdex.net/v2/en/cards", headers=headers, timeout=3)
         if res_eng.status_code == 200:
             for c in res_eng.json():
                 eng_cards_map[c.get("id")] = c.get("name")
@@ -181,7 +198,7 @@ def search_pokemon_cards(query):
     for lang_key, lang_code in LANG_CODES.items():
         try:
             url_tcgdex = f"https://api.tcgdex.net/v2/{lang_key}/cards"
-            res_dex = requests.get(url_tcgdex, headers=headers, timeout=4)
+            res_dex = requests.get(url_tcgdex, headers=headers, timeout=3)
             
             if res_dex.status_code == 200:
                 cards_list = res_dex.json()
@@ -209,7 +226,7 @@ def search_pokemon_cards(query):
                             img_url = f"{img_base}/high.png" if img_base else ""
                             
                             raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
-                            full_set_name, set_code = get_set_details(raw_set_id)
+                            full_set_name, set_code = get_set_details_sync(raw_set_id)
                             
                             eng_name = eng_cards_map.get(card_id, item.get("name", ""))
 
@@ -239,6 +256,9 @@ if "app_data" not in st.session_state:
 app_data = st.session_state["app_data"]
 if "collection" not in app_data:
     app_data["collection"] = []
+
+# Kör korrigering på laddad samling
+app_data["collection"] = fix_existing_collection_sets(app_data["collection"])
 
 eur_to_sek = fetch_eur_to_sek_rate()
 
@@ -372,7 +392,7 @@ with tab1:
 # --- FLIK 2: SÖK & LÄGG TILL ---
 with tab2:
     st.subheader("🔍 Sök på Namn, Nummer eller Setkod")
-    search_query = st.text_input("Sök t.ex. 'sm4 031' eller 'Whimsicott':", key="card_search_input")
+    search_query = st.text_input("Sök t.ex. 'sm4a 016' eller 'Alolan Raichu':", key="card_search_input")
     
     if search_query:
         with st.spinner("Söker kort..."):
@@ -405,7 +425,9 @@ with tab2:
                         st.write(f"**Setnr:** {number}")
 
                     with col_form:
-                        with st.form(key=f"add_form_{card_api['id']}"):
+                        # Unik nyckel med full_set_name för att undvika att Streamlit låser gamla formulärvärden
+                        form_key = f"form_{card_api['id']}_{full_set_name.replace(' ', '_')}"
+                        with st.form(key=form_key):
                             c_a, c_b = st.columns(2)
                             all_langs = ["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"]
                             default_lang_idx = all_langs.index(def_lang) if def_lang in all_langs else 0
