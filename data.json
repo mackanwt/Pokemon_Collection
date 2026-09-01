@@ -1,3 +1,21 @@
 {
-  "collection": []
+  "collection": [
+    {
+      "Bild": "https://tcgplayer-cdn.tcgplayer.com/product/572012_in_1000x1000.jpg",
+      "Pärmnummer": 1,
+      "Språk": "JPN",
+      "Namn": "アローラライチュウ",
+      "Setnr.": "016",
+      "SetBet.": "SM4A",
+      "Set": "SM4A",
+      "Övrigt": "Normal",
+      "Skick": "NM",
+      "Köpt för (EUR)": 3.33,
+      "Köpt för (SEK)": 38.3,
+      "Värde (EUR)": 2.7,
+      "Värde idag (SEK)": 31.05,
+      "Datum tillagd": "2026-09-01",
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=SM4A+016&language=7&minCondition=2"
+    }
+  ]
 }
