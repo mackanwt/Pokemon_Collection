@@ -136,10 +136,7 @@ def search_pokemon_cards(query):
                             seen_ids.add(unique_key)
                             
                             img_base = item.get("image", "")
-                            if img_base:
-                                img_url = f"{img_base}/high.png"
-                            else:
-                                img_url = "https://assets.tcgdex.net/back.png"
+                            img_url = f"{img_base}/high.png" if img_base else ""
 
                             set_code = card_id.split("-")[0].upper() if "-" in card_id else ""
                             
@@ -188,8 +185,9 @@ with tab1:
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * current_rate).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * current_rate).round(2)
         
+        # Säkerställ reservbild om fältet är tomt
         if "Bild" in df.columns:
-            df["Bild"] = df["Bild"].apply(lambda x: x if x else "https://assets.tcgdex.net/back.png")
+            df["Bild"] = df["Bild"].apply(lambda x: x if (x and str(x).startswith("http")) else "https://assets.tcgdex.net/back.png")
 
         col_actions1, col_actions2 = st.columns([2, 1])
         with col_actions1:
@@ -280,10 +278,11 @@ with tab2:
                     set_code = set_info.get("ptcgoCode", "").upper()
                     number = card_api.get("number", "")
                     def_lang = card_api.get("default_lang", "ENG")
-                    img_url = card_api.get("image_url", "")
+                    api_img_url = card_api.get("image_url", "")
 
                     with col_img:
-                        st.image(img_url, width=120)
+                        display_img = api_img_url if api_img_url else "https://assets.tcgdex.net/back.png"
+                        st.image(display_img, width=120)
 
                     with col_info:
                         st.markdown(f"### {card_name}")
@@ -305,14 +304,20 @@ with tab2:
                                 rarity = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], index=0)
                                 kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5)
                                 varde_eur = st.number_input("Värde (EUR - Manuellt)", min_value=0.0, value=2.70, step=0.5)
+                            
+                            # Manuellt fält för bild-länk om API saknar bild
+                            custom_img_url = st.text_input("Bild-URL (Klistra in länk om bilden saknas):", value=api_img_url)
 
                             if st.form_submit_button("➕ Lägg till i samlingen", type="primary", use_container_width=True):
                                 cm_url = generate_cardmarket_url(card_name, set_code, number, lang, cond)
                                 cm_price = fetch_cardmarket_price(cm_url)
                                 final_price = varde_eur if varde_eur > 0 else (cm_price if cm_price else 0.0)
+                                
+                                # Använd manuell URL i första hand, sedan API, sist baksida
+                                final_img = custom_img_url.strip() if custom_img_url.strip() else (api_img_url if api_img_url else "https://assets.tcgdex.net/back.png")
 
                                 new_entry = {
-                                    "Bild": img_url,
+                                    "Bild": final_img,
                                     "Pärmnummer": int(parm_nr),
                                     "Språk": lang,
                                     "Namn": card_name,
