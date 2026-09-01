@@ -61,8 +61,9 @@ def get_set_details_sync(set_id):
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=2)
         if res.status_code == 200:
             data = res.json()
-            set_name = data.get("name", "")
-            set_abbrev = data.get("abbreviation", "") or data.get("id", "").upper()
+            set_name = data.get("name") or ""
+            set_abbrev = data.get("abbreviation") or data.get("id") or ""
+            set_abbrev = str(set_abbrev).upper()
             if set_name and set_name.lower() != clean_id:
                 return set_name, set_abbrev
     except Exception:
@@ -128,10 +129,9 @@ def renumber_collection(collection_list):
 def fix_existing_collection_sets(collection_list):
     """Rensar gamla felaktiga setnamn i den sparade samlingen"""
     for card in collection_list:
-        current_set = str(card.get("Set", "")).strip()
-        set_bet = str(card.get("SetBet.", "")).strip()
+        current_set = str(card.get("Set") or "").strip()
+        set_bet = str(card.get("SetBet.") or "").strip()
         
-        # Om Set är samma som SetBet (t.ex. SM4A) eller finns i vår lista
         if current_set.lower() in JAPANESE_SET_MAP or current_set.lower() == set_bet.lower():
             real_name, real_bet = get_set_details_sync(current_set or set_bet)
             if real_name and real_name != current_set:
@@ -191,7 +191,8 @@ def search_pokemon_cards(query):
         res_eng = requests.get("https://api.tcgdex.net/v2/en/cards", headers=headers, timeout=3)
         if res_eng.status_code == 200:
             for c in res_eng.json():
-                eng_cards_map[c.get("id")] = c.get("name")
+                if c.get("id"):
+                    eng_cards_map[c.get("id")] = c.get("name") or ""
     except Exception:
         pass
 
@@ -203,9 +204,9 @@ def search_pokemon_cards(query):
             if res_dex.status_code == 200:
                 cards_list = res_dex.json()
                 for item in cards_list:
-                    c_id = str(item.get("id", "")).lower()
-                    c_name = str(item.get("name", "")).lower()
-                    c_local = str(item.get("localId", "")).lower()
+                    c_id = str(item.get("id") or "").lower()
+                    c_name = str(item.get("name") or "").lower()
+                    c_local = str(item.get("localId") or "").lower()
                     
                     matches_all = True
                     for w in search_words:
@@ -217,25 +218,25 @@ def search_pokemon_cards(query):
                             break
                     
                     if matches_all:
-                        card_id = item.get("id", "")
+                        card_id = str(item.get("id") or "")
                         unique_key = f"{card_id}_{lang_code}"
                         
                         if unique_key not in seen_ids:
                             seen_ids.add(unique_key)
-                            img_base = item.get("image", "")
+                            img_base = item.get("image") or ""
                             img_url = f"{img_base}/high.png" if img_base else ""
                             
                             raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
                             full_set_name, set_code = get_set_details_sync(raw_set_id)
                             
-                            eng_name = eng_cards_map.get(card_id, item.get("name", ""))
+                            eng_name = eng_cards_map.get(card_id, item.get("name") or "")
 
                             results.append({
                                 "id": unique_key,
-                                "name": item.get("name", ""),
+                                "name": item.get("name") or "",
                                 "eng_name": eng_name,
-                                "set_code": set_code,
-                                "set_name": full_set_name,
+                                "set_code": set_code or "",
+                                "set_name": full_set_name or "",
                                 "number": c_local,
                                 "image_url": img_url,
                                 "default_lang": lang_code
@@ -257,7 +258,6 @@ app_data = st.session_state["app_data"]
 if "collection" not in app_data:
     app_data["collection"] = []
 
-# Kör korrigering på laddad samling
 app_data["collection"] = fix_existing_collection_sets(app_data["collection"])
 
 eur_to_sek = fetch_eur_to_sek_rate()
@@ -405,13 +405,13 @@ with tab2:
                 with st.container():
                     col_img, col_info, col_form = st.columns([1, 2, 2])
                     
-                    card_name = card_api.get("name", "")
-                    eng_name = card_api.get("eng_name", card_name)
-                    set_code = card_api.get("set_code", "").upper()
-                    full_set_name = card_api.get("set_name", set_code)
-                    number = card_api.get("number", "")
-                    def_lang = card_api.get("default_lang", "ENG")
-                    api_img_url = card_api.get("image_url", "")
+                    card_name = str(card_api.get("name") or "")
+                    eng_name = str(card_api.get("eng_name") or card_name)
+                    set_code = str(card_api.get("set_code") or "").upper()
+                    full_set_name = str(card_api.get("set_name") or set_code)
+                    number = str(card_api.get("number") or "")
+                    def_lang = str(card_api.get("default_lang") or "ENG")
+                    api_img_url = str(card_api.get("image_url") or "")
 
                     with col_img:
                         display_img = get_image_as_base64(api_img_url)
@@ -425,8 +425,8 @@ with tab2:
                         st.write(f"**Setnr:** {number}")
 
                     with col_form:
-                        # Unik nyckel med full_set_name för att undvika att Streamlit låser gamla formulärvärden
-                        form_key = f"form_{card_api['id']}_{full_set_name.replace(' ', '_')}"
+                        safe_set_str = re.sub(r'[^a-zA-Z0-9_]', '_', full_set_name)
+                        form_key = f"form_{card_api['id']}_{safe_set_str}"
                         with st.form(key=form_key):
                             c_a, c_b = st.columns(2)
                             all_langs = ["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"]
