@@ -89,10 +89,11 @@ COND_MAP = {"MT": 1, "NM": 2, "EX": 3, "GD": 4, "LP": 5, "PL": 6, "PO": 7}
 def generate_cardmarket_url(card_name, set_code, number, lang_code="ENG", cond_code="NM", set_name=""):
     lang_id = LANG_MAP.get(lang_code, 1)
     cond_id = COND_MAP.get(cond_code, 2)
-    num_clean = number.split("/")[0].zfill(3) if number.split("/")[0].isdigit() else number
+    num_clean = str(number).split("/")[0].lstrip("0")  # Ta bort inledande nollor för bättre matchning på CM
 
+    # Konstruera en söksträng som Cardmarket förstår (Kortnamn + Setnamn + Nummer)
     if set_name and set_name != set_code:
-        search_str = f"{set_name} {num_clean}"
+        search_str = f"{card_name} {set_name} {num_clean}"
     else:
         search_str = f"{card_name} {num_clean}"
 
@@ -107,7 +108,7 @@ def generate_cardmarket_url(card_name, set_code, number, lang_code="ENG", cond_c
 # --- PRICECHARTING HÄMTNING (UNGRADED) ---
 @st.cache_data(ttl=3600)
 def fetch_pricecharting_ungraded(card_name, set_name, number):
-    num_clean = number.split("/")[0]
+    num_clean = str(number).split("/")[0]
     query = f"{card_name} {set_name} {num_clean}"
     url = f"https://www.pricecharting.com/api/products?q={urllib.parse.quote(query)}"
     
@@ -118,16 +119,18 @@ def fetch_pricecharting_ungraded(card_name, set_name, number):
             data = res.json()
             products = data.get("products", [])
             if products:
-                price_cents = products[0].get("loose-price") or products[0].get("ungraded-price")
-                if price_cents:
-                    return float(price_cents) / 100.0
+                # Hittar bäst matchande produkt ur sökningen
+                for prod in products:
+                    price_cents = prod.get("loose-price") or prod.get("ungraded-price")
+                    if price_cents:
+                        return float(price_cents) / 100.0
     except Exception:
         pass
     return None
 
 # --- MAPPNINGSSAMPLING FÖR SETKODER & SETNAMN ---
 SET_INFO_MAP = {
-    "SM1": {"code": "SUM", "name": "Sun & Moon Base"},
+    "SM1": {"code": "SUM", "name": "Sun & Moon"},
     "SM2": {"code": "GRI", "name": "Guardians Rising"},
     "SM3": {"code": "BUS", "name": "Burning Shadows"},
     "SM3.5": {"code": "SLG", "name": "Shining Legends"},
@@ -164,7 +167,7 @@ def search_pokemon_cards(query):
     seen_ids = set()
 
     LANG_CODES = {
-        "ja": "JPN", "en": "ENG", "fr": "FRA", "de": "GER", 
+        "en": "ENG", "ja": "JPN", "fr": "FRA", "de": "GER", 
         "es": "SPA", "it": "ITA", "pt": "POR", "ko": "KOR", "zh-tw": "ZHT"
     }
 
@@ -245,17 +248,25 @@ with tab1:
     collection = app_data["collection"]
     
     if collection:
+        # Säkerställ att alla objekt i källan har rätt Cardmarket-länk
+        for item in collection:
+            item["Cardmarket"] = generate_cardmarket_url(
+                item.get("Namn", ""), 
+                item.get("SetBet.", ""), 
+                item.get("Setnr.", ""), 
+                item.get("Språk", "ENG"), 
+                item.get("Skick", "NM"),
+                item.get("Set", "")
+            )
+
         df = pd.DataFrame(collection)
         
-        # Säkerställ att alla kolumner finns i DataFramen innan konvertering
-        for col in ["Värde (USD)", "Värde (EUR)", "Köpt för (EUR)", "Cardmarket"]:
+        # Säkerställ kolumner i dataframe
+        for col in ["Värde (USD)", "Köpt för (EUR)", "Cardmarket"]:
             if col not in df.columns:
                 df[col] = 0.0 if "Värde" in col or "Köpt" in col else ""
         
-        # Om gamla "Värde (EUR)" finns men inte "Värde (USD)", använd det som backup
-        if "Värde (USD)" in df.columns:
-            df["Värde (USD)"] = pd.to_numeric(df["Värde (USD)"], errors='coerce').fillna(0.0)
-        
+        df["Värde (USD)"] = pd.to_numeric(df["Värde (USD)"], errors='coerce').fillna(0.0)
         df["Köpt för (EUR)"] = pd.to_numeric(df["Köpt för (EUR)"], errors='coerce').fillna(0.0)
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * eur_to_sek).round(2)
         df["Värde idag (SEK)"] = (df["Värde (USD)"] * usd_to_sek).round(2)
@@ -265,12 +276,13 @@ with tab1:
 
         col_act1, col_act2, col_act3 = st.columns([2, 1, 1])
         with col_act1:
-            if st.button("🔄 Uppdatera priser (Ungraded från PriceCharting)", type="secondary"):
-                with st.spinner("Hämtar Ungraded-priser..."):
+            if st.button("🔄 Uppdatera priser & länkar", type="secondary"):
+                with st.spinner("Hämtar Ungraded-priser & genererar nya länkar..."):
                     updated_count = 0
                     
                     for item in app_data["collection"]:
-                        cm_url = generate_cardmarket_url(
+                        # Tvinga uppdatering av Cardmarket URL
+                        item["Cardmarket"] = generate_cardmarket_url(
                             item.get("Namn", ""), 
                             item.get("SetBet.", ""), 
                             item.get("Setnr.", ""), 
@@ -278,8 +290,8 @@ with tab1:
                             item.get("Skick", "NM"),
                             item.get("Set", "")
                         )
-                        item["Cardmarket"] = cm_url
 
+                        # Hämtar pris från PriceCharting
                         pc_price = fetch_pricecharting_ungraded(
                             item.get("Namn", ""),
                             item.get("Set", ""),
@@ -292,7 +304,7 @@ with tab1:
                                 
                     st.session_state["app_data"] = app_data
                     save_data_to_github(app_data)
-                    st.success(f"Uppdaterade Ungraded-priser för {updated_count} kort!")
+                    st.success(f"Uppdaterade priser och länkar för alla kort!")
                     st.rerun()
 
         with col_act2:
