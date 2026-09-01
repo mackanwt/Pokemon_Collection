@@ -15,8 +15,9 @@
       "Värde (EUR)": 0.0,
       "Värde idag (SEK)": 0.0,
       "Datum tillagd": "2026-09-01",
-      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=Alolan+Raichu+31&language=1&minCondition=2",
-      "Engelskt Namn": "Alolan Raichu"
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=Alolan%20Raichu",
+      "Engelskt Namn": "Alolan Raichu",
+      "PriceCharting": "https://www.pricecharting.com/search-products?q=Alolan%20Raichu&type=prices"
     },
     {
       "Bild": "",
@@ -33,8 +34,9 @@
       "Värde (EUR)": 0.0,
       "Värde idag (SEK)": 0.0,
       "Datum tillagd": "2026-09-01",
-      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=Whimsicott+ex+16&language=7&minCondition=2",
-      "Engelskt Namn": "Whimsicott ex"
+      "Cardmarket": "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=Whimsicott%20ex",
+      "Engelskt Namn": "Whimsicott ex",
+      "PriceCharting": "https://www.pricecharting.com/search-products?q=Whimsicott%20ex%20japanese&type=prices"
     }
   ]
 }
