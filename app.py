@@ -82,73 +82,44 @@ def get_image_as_base64(url):
         
     return "https://assets.tcgdex.net/back.png"
 
-# --- HJÄLPFUNKTION: REPARATION AV ENGELSKT NAMN FÖR GAMLA KORT ---
-@st.cache_data(ttl=86400)
-def get_english_name_fallback(card_name, set_code, number):
-    # Om namnet innehåller icke-ASCII (t.ex. japanska), sök engelskt namn via TCGdex
-    if not re.search(r'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9faf]', card_name):
-        return card_name
-    
-    try:
-        url = f"https://api.tcgdex.net/v2/en/cards"
-        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
-        if res.status_code == 200:
-            num_clean = str(number).split("/")[0].lstrip("0")
-            for c in res.json():
-                c_local = str(c.get("localId", "")).lstrip("0")
-                if c_local == num_clean:
-                    return c.get("name")
-    except Exception:
-        pass
-    return card_name
-
-# --- CARDMARKET URL GENERATOR ---
-LANG_MAP = {"ENG": 1, "FRA": 2, "GER": 3, "SPA": 4, "ITA": 5, "JPN": 7, "POR": 8, "KOR": 9, "ZHT": 10}
-COND_MAP = {"MT": 1, "NM": 2, "EX": 3, "GD": 4, "LP": 5, "PL": 6, "PO": 7}
-
-def generate_cardmarket_url(card_name_eng, set_code, number, lang_code="ENG", cond_code="NM", set_name=""):
-    lang_id = LANG_MAP.get(lang_code, 1)
-    cond_id = COND_MAP.get(cond_code, 2)
-    num_clean = str(number).split("/")[0].lstrip("0")
-
-    # Om namnet fortfarande är japanskt, gör en nödfallskonvertering
-    clean_name = get_english_name_fallback(card_name_eng, set_code, number)
-    search_str = f"{clean_name} {num_clean}"
-
-    base_url = "https://www.cardmarket.com/en/Pokemon/Products/Search"
-    params = {
-        "searchString": search_str,
-        "language": lang_id,
-        "minCondition": cond_id
-    }
-    return f"{base_url}?{urllib.parse.urlencode(params)}"
-
-# --- PRICECHARTING HÄMTNING ---
+# --- GRATIS AUTOMATISK PRISHÄMTNING (TCGdex / TCGplayer) ---
 @st.cache_data(ttl=3600)
-def fetch_pricecharting_ungraded(card_name_eng, number, is_japanese=False):
-    """Söker pris på PriceCharting via HTML-parsing (kräver inte API-nyckel)."""
-    clean_name = get_english_name_fallback(card_name_eng, "", number)
-    num_clean = str(number).split("/")[0].lstrip("0")
-    
-    query = f"{clean_name} japanese" if is_japanese else f"{clean_name} {num_clean}"
-    url = f"https://www.pricecharting.com/search-products?q={urllib.parse.quote(query)}&type=prices"
-    
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+def fetch_card_price_usd(card_id):
+    """Hämtar marknadspris i USD från TCGdex öppna API (kostnadsfritt)."""
+    if not card_id:
+        return 0.0
+    # Rensa språkprefix om det finns
+    clean_id = card_id.split("_")[0]
+    url = f"https://api.tcgdex.net/v2/en/cards/{clean_id}"
     try:
-        res = requests.get(url, headers=headers, timeout=5)
+        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=4)
         if res.status_code == 200:
-            # Sök efter ungraded-pris direkt i HTML-svaret
-            match = re.search(r'id="used_price"[^>]*>\s*\$([0-9\.]+)', res.text)
-            if match:
-                return float(match.group(1))
-            
-            # Om direkt match saknas, leta i tabellens första träff
-            match_table = re.search(r'class="price numeric price_modal[^"]*"[^>]*>\s*\$([0-9\.]+)', res.text)
-            if match_table:
-                return float(match_table.group(1))
+            data = res.json()
+            pricing = data.get("variants", {})
+            # Leta efter priser i olika varianter
+            for var in ["normal", "reverse", "holo", "firstEdition"]:
+                if var in pricing and pricing[var]:
+                    return float(pricing[var])
+            # Fallback till TCGplayer-strukturen om den finns
+            tcg_data = data.get("pricing", {}).get("tcgplayer", {})
+            if "mid" in tcg_data:
+                return float(tcg_data["mid"])
+            elif "market" in tcg_data:
+                return float(tcg_data["market"])
     except Exception:
         pass
-    return None
+    return 0.0
+
+# --- LÄNKGENERATORER ---
+def generate_cardmarket_url(card_name_eng):
+    # Säker sökning på enbart engelskt namn för att undvika fel träffar på japanska kort
+    clean_name = re.sub(r'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9faf]', '', card_name_eng).strip()
+    return f"https://www.cardmarket.com/en/Pokemon/Products/Search?searchString={urllib.parse.quote(clean_name)}"
+
+def generate_pricecharting_url(card_name_eng, is_japanese=False):
+    clean_name = re.sub(r'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9faf]', '', card_name_eng).strip()
+    query = f"{clean_name} japanese" if is_japanese else clean_name
+    return f"https://www.pricecharting.com/search-products?q={urllib.parse.quote(query)}&type=prices"
 
 # --- MAPPNINGSSAMPLING FÖR SETKODER & SETNAMN ---
 SET_INFO_MAP = {
@@ -245,6 +216,7 @@ def search_pokemon_cards(query):
 
                             results.append({
                                 "id": unique_key,
+                                "raw_id": card_id,
                                 "name": item.get("name", ""),
                                 "eng_name": eng_name,
                                 "set": {"name": final_set_name, "ptcgoCode": final_set_code},
@@ -285,7 +257,7 @@ with tab1:
     if collection:
         df = pd.DataFrame(collection)
         
-        for col in ["Värde (USD)", "Köpt för (EUR)", "Cardmarket", "Engelskt Namn"]:
+        for col in ["Värde (USD)", "Köpt för (EUR)", "Cardmarket", "PriceCharting", "Engelskt Namn", "API_ID"]:
             if col not in df.columns:
                 df[col] = 0.0 if "Värde" in col or "Köpt" in col else ""
         
@@ -299,38 +271,24 @@ with tab1:
 
         col_act1, col_act2, col_act3 = st.columns([2, 1, 1])
         with col_act1:
-            if st.button("🔄 Uppdatera priser & länkar", type="secondary"):
-                with st.spinner("Hämtar priser & åtgärdar länkar..."):
-                    updated_count = 0
-                    
+            if st.button("🔄 Uppdatera marknadspriser", type="secondary"):
+                with st.spinner("Hämtar senaste marknadspriser..."):
                     for item in app_data["collection"]:
                         search_name = item.get("Engelskt Namn") or item.get("Namn", "")
-                        search_name = get_english_name_fallback(search_name, item.get("SetBet.", ""), item.get("Setnr.", ""))
-                        item["Engelskt Namn"] = search_name
+                        item["Cardmarket"] = generate_cardmarket_url(search_name)
+                        item["PriceCharting"] = generate_pricecharting_url(search_name, is_japanese=(item.get("Språk") == "JPN"))
+                        
+                        # Hämta live-pris via gratis TCGdex API
+                        api_id = item.get("API_ID")
+                        if api_id:
+                            live_price = fetch_card_price_usd(api_id)
+                            if live_price > 0:
+                                item["Värde (USD)"] = live_price
+                                item["Värde idag (SEK)"] = round(live_price * usd_to_sek, 2)
 
-                        item["Cardmarket"] = generate_cardmarket_url(
-                            search_name, 
-                            item.get("SetBet.", ""), 
-                            item.get("Setnr.", ""), 
-                            item.get("Språk", "ENG"), 
-                            item.get("Skick", "NM"),
-                            item.get("Set", "")
-                        )
-
-                        is_jpn = item.get("Språk") == "JPN"
-                        pc_price = fetch_pricecharting_ungraded(
-                            search_name,
-                            item.get("Setnr.", ""),
-                            is_japanese=is_jpn
-                        )
-                        if pc_price is not None:
-                            item["Värde (USD)"] = pc_price
-                            item["Värde idag (SEK)"] = round(pc_price * usd_to_sek, 2)
-                            updated_count += 1
-                                
                     st.session_state["app_data"] = app_data
                     save_data_to_github(app_data)
-                    st.success("Alla länkar och priser har uppdaterats!")
+                    st.success("Priser och länkar har uppdaterats!")
                     st.rerun()
 
         with col_act2:
@@ -338,7 +296,7 @@ with tab1:
 
         columns_order = [
             "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
-            "Övrigt", "Skick", "Köpt för (EUR)", "Värde (USD)", "Värde idag (SEK)", "Cardmarket"
+            "Övrigt", "Skick", "Köpt för (EUR)", "Värde (USD)", "Värde idag (SEK)", "Cardmarket", "PriceCharting"
         ]
 
         if not edit_mode:
@@ -353,9 +311,10 @@ with tab1:
                 "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
                 "Skick": st.column_config.TextColumn("Skick", width="small"),
                 "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
-                "Värde (USD)": st.column_config.NumberColumn("Ungraded ($)", format="$%.2f", width="small"),
+                "Värde (USD)": st.column_config.NumberColumn("Marknad ($)", format="$%.2f", width="small"),
                 "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width="small"),
-                "Cardmarket": st.column_config.LinkColumn("Cardmarket", display_text="🔗 Cardmarket", width="medium")
+                "Cardmarket": st.column_config.LinkColumn("Cardmarket", display_text="🔗 Cardmarket", width="medium"),
+                "PriceCharting": st.column_config.LinkColumn("PriceCharting", display_text="📈 PriceCharting", width="medium")
             }
             st.dataframe(df[columns_order], column_config=column_config, use_container_width=True, hide_index=True)
         
@@ -371,9 +330,10 @@ with tab1:
                 "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
                 "Skick": st.column_config.TextColumn("Skick", width="small"),
                 "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
-                "Värde (USD)": st.column_config.NumberColumn("Ungraded ($)", format="$%.2f", width="small"),
+                "Värde (USD)": st.column_config.NumberColumn("Marknad ($)", format="$%.2f", width="small"),
                 "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width="small", disabled=True),
-                "Cardmarket": st.column_config.TextColumn("Cardmarket URL", width="medium")
+                "Cardmarket": st.column_config.TextColumn("Cardmarket URL", width="medium"),
+                "PriceCharting": st.column_config.TextColumn("PriceCharting URL", width="medium")
             }
 
             edited_df = st.data_editor(
@@ -432,6 +392,7 @@ with tab2:
                     number = card_api.get("number", "")
                     def_lang = card_api.get("default_lang", "ENG")
                     api_img_url = card_api.get("image_url", "")
+                    raw_id = card_api.get("raw_id", "")
 
                     with col_img:
                         display_img = get_image_as_base64(api_img_url)
@@ -456,19 +417,23 @@ with tab2:
                             with c_b:
                                 rarity = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], index=0)
                                 kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5)
-                                varde_usd_manual = st.number_input("Värde ($ - Manuellt)", min_value=0.0, value=0.0, step=0.5)
+                                varde_usd_manual = st.number_input("Värde ($ - Manuellt överskrid)", min_value=0.0, value=0.0, step=0.5)
                             
                             custom_img_url = st.text_input("Bild-URL (Klistra in länk om bilden saknas):", value=api_img_url)
 
                             if st.form_submit_button("➕ Lägg till i samlingen", type="primary", use_container_width=True):
                                 is_jpn = (lang == "JPN")
-                                cm_url = generate_cardmarket_url(eng_name, set_code, number, lang, cond, set_name)
-                                pc_price = fetch_pricecharting_ungraded(eng_name, number, is_japanese=is_jpn)
+                                cm_url = generate_cardmarket_url(eng_name)
+                                pc_url = generate_pricecharting_url(eng_name, is_japanese=is_jpn)
                                 
-                                final_usd = varde_usd_manual if varde_usd_manual > 0 else (pc_price if pc_price is not None else 0.0)
+                                # Hämta automatiskt pris från API
+                                auto_price = fetch_card_price_usd(raw_id)
+                                final_usd = varde_usd_manual if varde_usd_manual > 0 else auto_price
+
                                 raw_img = custom_img_url.strip() if custom_img_url.strip() else (api_img_url if api_img_url else "")
 
                                 new_entry = {
+                                    "API_ID": raw_id,
                                     "Bild": raw_img,
                                     "Pärmnummer": int(parm_nr),
                                     "Språk": lang,
@@ -484,7 +449,8 @@ with tab2:
                                     "Värde (USD)": final_usd,
                                     "Värde idag (SEK)": round(final_usd * usd_to_sek, 2),
                                     "Datum tillagd": date.today().strftime("%Y-%m-%d"),
-                                    "Cardmarket": cm_url
+                                    "Cardmarket": cm_url,
+                                    "PriceCharting": pc_url
                                 }
                                 
                                 for existing_card in app_data["collection"]:
