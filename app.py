@@ -83,16 +83,23 @@ def get_image_as_base64(url):
         
     return "https://assets.tcgdex.net/back.png"
 
-# --- CARDMARKET URL GENERATOR ---
+# --- CARDMARKET URL GENERATOR & PRISHÄMTNING ---
 LANG_MAP = {"ENG": 1, "FRA": 2, "GER": 3, "SPA": 4, "ITA": 5, "JPN": 7, "POR": 8, "KOR": 9, "ZHT": 10}
 COND_MAP = {"MT": 1, "NM": 2, "EX": 3, "GD": 4, "LP": 5, "PL": 6, "PO": 7}
 
-def generate_cardmarket_url(card_name, set_code, number, lang_code="JPN", cond_code="NM"):
-    lang_id = LANG_MAP.get(lang_code, 7)
+def generate_cardmarket_url(card_name, set_code, number, lang_code="ENG", cond_code="NM"):
+    lang_id = LANG_MAP.get(lang_code, 1)
     cond_id = COND_MAP.get(cond_code, 2)
     
     num_clean = number.split("/")[0].zfill(3) if number.split("/")[0].isdigit() else number
-    search_str = f"{set_code} {num_clean}"
+
+    # För engelska/västerländska kort söker vi på setkod + nummer (t.ex. CIN 031)
+    # För japanska söker vi på japanskt namn + nummer (t.ex. アローライチュウ 016)
+    if lang_code in ["ENG", "FRA", "GER", "SPA", "ITA", "POR"]:
+        search_str = f"{set_code} {num_clean}"
+    else:
+        search_str = f"{card_name} {num_clean}"
+
     base_url = "https://www.cardmarket.com/en/Pokemon/Products/Search"
     params = {
         "searchString": search_str,
@@ -102,13 +109,25 @@ def generate_cardmarket_url(card_name, set_code, number, lang_code="JPN", cond_c
     return f"{base_url}?{urllib.parse.urlencode(params)}"
 
 def fetch_cardmarket_price(url):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache"
+    }
     try:
-        res = requests.get(url, headers=headers, timeout=4)
+        res = requests.get(url, headers=headers, timeout=6)
         if res.status_code == 200:
-            match = re.search(r'30-days average price.*?>([\d,.]+)\s*€', res.text, re.IGNORECASE | re.DOTALL)
-            if match:
-                return float(match.group(1).replace(',', '.'))
+            patterns = [
+                r'30-day[s]? average price.*?>([\d,.]+)\s*€',
+                r'7-day[s]? average price.*?>([\d,.]+)\s*€',
+                r'Price Trend.*?>([\d,.]+)\s*€',
+                r'From.*?>([\d,.]+)\s*€'
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, res.text, re.IGNORECASE | re.DOTALL)
+                if match:
+                    return float(match.group(1).replace(',', '.'))
     except Exception:
         pass
     return None
@@ -289,18 +308,34 @@ with tab1:
             if st.button("🔄 Uppdatera priser (30-dagars snitt från Cardmarket)", type="secondary"):
                 with st.spinner("Hämtar senaste priser från Cardmarket..."):
                     updated_count = 0
+                    failed_cards = []
+                    
                     for item in app_data["collection"]:
-                        cm_url = item.get("Cardmarket", "")
-                        if cm_url:
-                            fetched_price = fetch_cardmarket_price(cm_url)
-                            if fetched_price is not None:
-                                item["Värde (EUR)"] = fetched_price
-                                item["Värde idag (SEK)"] = round(fetched_price * current_rate, 2)
-                                updated_count += 1
+                        # Skapa / uppdatera URL för Cardmarket
+                        cm_url = generate_cardmarket_url(
+                            item.get("Namn", ""), 
+                            item.get("SetBet.", ""), 
+                            item.get("Setnr.", ""), 
+                            item.get("Språk", "ENG"), 
+                            item.get("Skick", "NM")
+                        )
+                        item["Cardmarket"] = cm_url
+
+                        fetched_price = fetch_cardmarket_price(cm_url)
+                        if fetched_price is not None and fetched_price > 0:
+                            item["Värde (EUR)"] = fetched_price
+                            item["Värde idag (SEK)"] = round(fetched_price * current_rate, 2)
+                            updated_count += 1
+                        else:
+                            failed_cards.append(item.get("Namn", "Okänt kort"))
                                 
                     st.session_state["app_data"] = app_data
                     save_data_to_github(app_data)
-                    st.success(f"Uppdaterade priser för {updated_count} kort!")
+                    
+                    if updated_count > 0:
+                        st.success(f"Uppdaterade priser för {updated_count} kort!")
+                    if failed_cards:
+                        st.warning(f"Kunde inte automatisk hämta pris för: {', '.join(failed_cards)}. Länkarna har uppdaterats i tabellen.")
                     st.rerun()
 
         with col_act2:
@@ -437,7 +472,6 @@ with tab2:
                                 cm_url = generate_cardmarket_url(card_name, set_code, number, lang, cond)
                                 cm_price = fetch_cardmarket_price(cm_url)
                                 
-                                # Prioritera Cardmarket-pris om inget manuellt pris angetts
                                 final_price = varde_eur if varde_eur > 0 else (cm_price if cm_price is not None else 0.0)
                                 
                                 raw_img = custom_img_url.strip() if custom_img_url.strip() else (api_img_url if api_img_url else "")
