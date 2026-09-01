@@ -114,12 +114,12 @@ def generate_google_cardmarket_url(name, number, set_name):
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
 @st.cache_data(ttl=3600)
-def get_set_details(set_id, lang="en"):
-    """Hämtar riktigt setnamn och förkortning (t.ex. Crimson Invasion & CIN)"""
+def get_set_details(set_id):
+    """Hämtar alltid engelskt setnamn och förkortning"""
     if not set_id:
         return "", ""
     try:
-        url = f"https://api.tcgdex.net/v2/{lang}/sets/{set_id}"
+        url = f"https://api.tcgdex.net/v2/en/sets/{set_id}"
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
         if res.status_code == 200:
             data = res.json()
@@ -188,9 +188,8 @@ def search_pokemon_cards(query):
                             img_base = item.get("image", "")
                             img_url = f"{img_base}/high.png" if img_base else ""
                             
-                            # Hämta set-information
                             raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
-                            full_set_name, set_code = get_set_details(raw_set_id, lang_key)
+                            full_set_name, set_code = get_set_details(raw_set_id)
                             
                             eng_name = eng_cards_map.get(card_id, item.get("name", ""))
 
