@@ -14,16 +14,16 @@ GITHUB_REPO = st.secrets["GITHUB_REPO"]
 DATA_FILE_PATH = "pokemon_collection_data.json"
 
 SET_FILES = [
-    "pokemon_sets_japan_part1.json",
-    "pokemon_sets_japan_part2.json",
+    "pokemon_sets_japanese_part1.json",
+    "pokemon_sets_japanese_part2.json",
     "pokemon_sets_english.json",
     "pokemon_sets_egna.json"
 ]
 
 DEFAULT_SETS = [
-    {"id": "base1", "ptcgoCode": "BS", "name": "Base Set", "language": "ENG", "total": 102},
-    {"id": "sva", "ptcgoCode": "MEW", "name": "151", "language": "ENG", "total": 165},
-    {"id": "sv3", "ptcgoCode": "OBF", "name": "Obsidian Flames", "language": "ENG", "total": 197}
+    {"SetBet": "BS", "SetName": "Base Set", "Språk": "ENG", "Total": 102},
+    {"SetBet": "MEW", "SetName": "151", "Språk": "ENG", "Total": 165},
+    {"SetBet": "OBF", "SetName": "Obsidian Flames", "Språk": "ENG", "Total": 197}
 ]
 
 # --- SÄKER GITHUB-FUNKTION ---
@@ -38,7 +38,7 @@ def github_load_file(file_path: str, default_data: Any) -> Any:
                 return default_data
             return json.loads(content)
         except Exception as e:
-            st.error(f"⚠️ JSON-fel i filen **{file_path}**: Kontrollera syntaxen. Detalj: {e}")
+            st.error(f"⚠️ JSON-fel i filen **{file_path}**: {e}")
             return default_data
     return default_data
 
@@ -100,30 +100,56 @@ if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
     
     for file_path in SET_FILES:
         data = github_load_file(file_path, [])
+        
+        items_list = []
         if isinstance(data, list):
-            for item in data:
-                set_bet = str(item.get("SetBet") or item.get("ptcgoCode") or item.get("id") or "").strip()
-                set_name = str(item.get("SetName") or item.get("name") or "").strip()
-                lang = str(item.get("Language") or item.get("language") or item.get("Språk") or "ENG").strip().upper()
-                
-                raw_total = item.get("TotalCards") or item.get("printedTotal") or item.get("total") or item.get("Maxantal kort") or 0
-                try:
-                    total_cards = int(str(raw_total).strip())
-                except ValueError:
-                    total_cards = 0
+            items_list = data
+        elif isinstance(data, dict):
+            for k in ["sets", "data", "results", "items"]:
+                if k in data and isinstance(data[k], list):
+                    items_list = data[k]
+                    break
+            if not items_list:
+                items_list = [val for val in data.values() if isinstance(val, dict)]
 
-                unique_key = f"{set_bet}_{lang}"
-                if set_bet and unique_key not in seen_keys:
-                    seen_keys.add(unique_key)
-                    normalized_item = {
-                        "id": set_bet,
-                        "ptcgoCode": set_bet,
-                        "name": set_name,
-                        "language": lang,
-                        "total": total_cards,
-                        "images": item.get("images", {})
-                    }
-                    combined_sets.append(normalized_item)
+        for item in items_list:
+            if not isinstance(item, dict):
+                continue
+            
+            set_bet = str(item.get("SetBet") or item.get("ptcgoCode") or item.get("id") or "").strip()
+            set_name = str(item.get("SetName") or item.get("name") or "").strip()
+            
+            raw_lang = str(item.get("Language") or item.get("language") or item.get("Språk") or "ENG").strip().upper()
+            if "JAPAN" in raw_lang or raw_lang in ["JP", "JPN"]:
+                lang = "JPN"
+            else:
+                lang = raw_lang[:3]
+            
+            raw_total = item.get("TotalCards") or item.get("printedTotal") or item.get("total") or item.get("Maxantal kort") or 0
+            try:
+                total_cards = int(str(raw_total).strip())
+            except ValueError:
+                total_cards = 0
+
+            unique_key = f"{set_bet}_{lang}"
+            if set_bet and unique_key not in seen_keys:
+                seen_keys.add(unique_key)
+                
+                img_dict = item.get("images", {})
+                img_url = ""
+                if isinstance(img_dict, dict):
+                    img_url = img_dict.get("small", "") or img_dict.get("logo", "")
+                elif isinstance(img_dict, str):
+                    img_url = img_dict
+
+                normalized_item = {
+                    "SetBet": set_bet,
+                    "SetName": set_name,
+                    "Språk": lang,
+                    "Total": total_cards,
+                    "images": img_url
+                }
+                combined_sets.append(normalized_item)
 
     if not combined_sets:
         combined_sets = DEFAULT_SETS
@@ -253,14 +279,14 @@ with tab1:
                     if set_nr_input and (not set_bet or not set_name):
                         target_num = clean_num(set_nr_input)
                         for s_item in sets_db:
-                            db_num = clean_num(s_item.get("total", ""))
+                            db_num = clean_num(s_item.get("Total", ""))
                             if db_num and str(db_num) == target_num:
                                 if not set_bet:
-                                    set_bet = s_item.get("ptcgoCode") or s_item.get("id", "").upper()
+                                    set_bet = s_item.get("SetBet", "")
                                 if not set_name:
-                                    set_name = s_item.get("name", "")
-                                if not img_url and "images" in s_item:
-                                    img_url = s_item["images"].get("small", "")
+                                    set_name = s_item.get("SetName", "")
+                                if not img_url:
+                                    img_url = s_item.get("images", "")
                                 break
 
                     clean_card = {
@@ -332,8 +358,8 @@ with tab2:
     matching_sets = []
     if card_number is not None:
         for s_item in sets_db:
-            s_lang = s_item.get("language", "ENG")
-            total_cards = s_item.get("total", 0)
+            s_lang = s_item.get("Språk", "ENG")
+            total_cards = s_item.get("Total", 0)
             
             if s_lang == reg_language.upper() and total_cards >= card_number:
                 matching_sets.append(s_item)
@@ -341,7 +367,7 @@ with tab2:
     selected_set = None
     if matching_sets:
         set_options = {
-            f"{s.get('name')} ({s.get('id')}) — Total: {s.get('total')} kort": s
+            f"{s.get('SetName')} ({s.get('SetBet')}) — Total: {s.get('Total')} kort": s
             for s in matching_sets
         }
         chosen_label = st.selectbox("Välj matchande Set:", options=list(set_options.keys()))
@@ -368,10 +394,9 @@ with tab2:
             img_url = ""
 
             if selected_set:
-                set_bet = selected_set.get("ptcgoCode") or selected_set.get("id", "").upper()
-                set_name = selected_set.get("name", "")
-                if "images" in selected_set:
-                    img_url = selected_set["images"].get("small", "")
+                set_bet = selected_set.get("SetBet", "")
+                set_name = selected_set.get("SetName", "")
+                img_url = selected_set.get("images", "")
 
             next_p_nr = len(collection) + 1
 
@@ -409,7 +434,7 @@ with tab2:
 # --- FLIK 3: NAMN-INSTÄLLNINGAR ---
 with tab3:
     st.subheader("⚙️ Hantera sparade Pokémon-namn")
-    st.caption("Lägg till eller ta bort namn för snabbval i listan.")
+    st.caption("Lägg till eller ta bort namn från listan.")
 
     current_names = app_data.get("custom_names", [])
     
@@ -426,18 +451,21 @@ with tab3:
                 st.success(f"Namnet '{new_custom_name}' lades till!")
                 st.rerun()
 
+    st.write("### Sparade namn:")
     if current_names:
-        st.write("### Befintliga namn:")
-        name_to_remove = st.selectbox("Välj namn att ta bort", options=current_names)
-        if st.button("Ta bort valt namn", type="secondary"):
-            current_names.remove(name_to_remove)
-            app_data["custom_names"] = current_names
-            save_payload = {"collection": app_data.get("collection", []), "custom_names": current_names}
-            success, msg = github_save_file(DATA_FILE_PATH, save_payload, f"Tog bort namn: {name_to_remove}")
-            if success:
-                st.session_state["app_data"] = None
-                st.success(f"Tog bort '{name_to_remove}'.")
-                st.rerun()
+        for name in list(current_names):
+            col_name, col_btn = st.columns([4, 1])
+            col_name.write(f"- {name}")
+            if col_btn.button("Ta bort", key=f"del_name_{name}"):
+                current_names.remove(name)
+                app_data["custom_names"] = current_names
+                save_payload = {"collection": app_data.get("collection", []), "custom_names": current_names}
+                success, msg = github_save_file(DATA_FILE_PATH, save_payload, f"Tog bort namn: {name}")
+                if success:
+                    st.session_state["app_data"] = None
+                    st.rerun()
+    else:
+        st.info("Inga sparade namn tillagda ännu.")
 
 # --- FLIK 4: SET-DATABAS ---
 with tab4:
@@ -448,8 +476,12 @@ with tab4:
 
     if sets_db:
         sets_df = pd.DataFrame(sets_db)
-        if db_lang_filter != "Alla" and "language" in sets_df.columns:
-            sets_df = sets_df[sets_df["language"] == db_lang_filter]
+        if "images" in sets_df.columns:
+            sets_df = sets_df.drop(columns=["images"])
+            
+        if db_lang_filter != "Alla" and "Språk" in sets_df.columns:
+            sets_df = sets_df[sets_df["Språk"] == db_lang_filter]
+            
         st.dataframe(sets_df, use_container_width=True, hide_index=True)
     else:
         st.info("Inga set hittades.")
