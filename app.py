@@ -152,7 +152,7 @@ if "editor_version" not in st.session_state:
     st.session_state["editor_version"] = 0
 
 if "app_data" not in st.session_state or st.session_state["app_data"] is None:
-    st.session_state["app_data"] = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": DEFAULT_POKEMON_NAMES})
+    st.session_state["app_data"] = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": []})
 
 if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
     combined_sets = []
@@ -171,8 +171,8 @@ sets_db = st.session_state["sets_data"]
 
 if "collection" not in app_data:
     app_data["collection"] = []
-if "custom_names" not in app_data or not app_data["custom_names"]:
-    app_data["custom_names"] = DEFAULT_POKEMON_NAMES
+if "custom_names" not in app_data:
+    app_data["custom_names"] = []
 
 app_data["collection"] = fix_existing_collection(app_data["collection"])
 eur_to_sek = fetch_eur_to_sek_rate()
