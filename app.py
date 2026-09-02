@@ -482,6 +482,7 @@ with tab3:
                 save_payload = {"collection": app_data.get("collection", []), "custom_names": names_list}
                 success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade namnlista")
                 if success:
+                    st.session_state["app_data"] = None  # Rensar cachen så nya listan hämtas
                     st.success(f"Lade till '{clean_n}'!")
                     st.rerun()
                 else:
@@ -504,11 +505,12 @@ with tab3:
         save_payload = {"collection": app_data.get("collection", []), "custom_names": updated_names}
         success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Redigerade namnlista")
         if success:
+            st.session_state["app_data"] = None  # Rensar cachen så raderingarna sparas på riktigt
             st.success("Namnlistan uppdaterades!")
             st.rerun()
         else:
             st.error(msg)
-
+            
 # --- FLIK 4: SET-DATABAS ---
 with tab4:
     st.subheader("🗂️ Global Set-databas")
