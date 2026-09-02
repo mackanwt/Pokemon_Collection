@@ -334,114 +334,102 @@ with tab1:
 
 # --- FLIK 2: DIREKT-REGISTRERING ---
 with tab2:
-    st.subheader("⚡ Snabb-registrering via direktredigering")
-    st.caption("Fyll i raden nedan och tryck Enter. SetBet och Set-namn beräknas automatiskt utifrån Språk, Namn och Setnr.")
+    st.subheader("⚡ Snabb-registrering")
+    st.caption("Välj språk, namn och setnummer för att hämta rätt set automatiskt.")
 
-    if "quick_entry_df" not in st.session_state:
-        next_p_nr = len(collection) + 1
-        st.session_state["quick_entry_df"] = pd.DataFrame([{
-            "Pärmnr.": next_p_nr,
-            "Språk": "ENG",
-            "Namn": "",
-            "Setnr.": "",
-            "SetBet.": "",
-            "Set": "",
-            "Övrigt": "Normal",
-            "Skick": "NM",
-            "Köpt (EUR)": 0.0,
-            "Värde (EUR)": 0.0
-        }])
+    # 1. Hämta sparade namn till rullistan
+    saved_names = app_data.get("custom_names", [])
 
-    column_config_quick = {
-        "Pärmnr.": st.column_config.NumberColumn("Pärmnr.", width=60, disabled=True),
-        "Språk": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width=70),
-        "Namn": st.column_config.TextColumn("Namn", width=150),
-        "Setnr.": st.column_config.TextColumn("Setnr.", width=90),
-        "SetBet.": st.column_config.TextColumn("SetBet.", width=80),
-        "Set": st.column_config.TextColumn("Set", width=160),
-        "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], width=90),
-        "Skick": st.column_config.SelectboxColumn("Skick", options=["NM", "EX", "GD", "LP", "PL", "PO"], width=60),
-        "Köpt (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width=80),
-        "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width=80),
-    }
+    c1, c2, c3 = st.columns([1, 2, 2])
+    with c1:
+        reg_language = st.selectbox("Språk", ["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], index=0)
+    with c2:
+        if saved_names:
+            reg_name = st.selectbox("Pokémon-namn", options=saved_names)
+        else:
+            reg_name = st.text_input("Pokémon-namn", placeholder="T.ex. Togepi")
+    with c3:
+        reg_setnr_raw = st.text_input("Setnr.", placeholder="T.ex. 043/108 eller 043")
 
-    edited_quick_df = st.data_editor(
-        st.session_state["quick_entry_df"],
-        column_config=column_config_quick,
-        use_container_width=True,
-        hide_index=True,
-        key="quick_editor"
-    )
+    # Extrahera enbart siffran från input (t.ex. "043/108" -> 43)
+    clean_num_str = reg_setnr_raw.split('/')[0].strip().lstrip('0')
+    card_number = int(clean_num_str) if clean_num_str.isdigit() else None
 
-    row = edited_quick_df.iloc[0]
-    input_name = str(row.get("Namn") or "").strip()
-    input_setnr = str(row.get("Setnr.") or "").strip()
-
-    # Smart söklogik baserad på Namn och Setnr
-    found_set = None
-    if input_setnr or input_name:
-        clean_input = input_setnr.lower().replace(" ", "")
-        
+    # Filter-logik för set-databasen
+    matching_sets = []
+    if card_number is not None:
         for s_item in sets_db:
-            s_id = str(s_item.get("id", "")).lower()
-            s_code = str(s_item.get("ptcgoCode", "")).lower()
-            s_num = str(s_item.get("number", "")).lower()
-            
-            # 1. Om man skrivit t.ex. "043/108" eller "sv3 043"
-            if clean_input and (clean_input in f"{s_id}{s_num}" or clean_input in f"{s_code}{s_num}" or clean_input == s_id or clean_input == s_code):
-                found_set = s_item
-                break
+            total_cards = s_item.get("printedTotal") or s_item.get("total") or 0
+            # Om setet har tillräckligt många kort för att innehålla detta nummer
+            if total_cards >= card_number:
+                matching_sets.append(s_item)
 
-    if found_set:
-        auto_setbet = found_set.get("ptcgoCode") or found_set.get("id", "").upper()
-        auto_setname = found_set.get("name", "")
-        
-        edited_quick_df.at[0, "SetBet."] = auto_setbet
-        edited_quick_df.at[0, "Set"] = auto_setname
-        st.session_state["quick_entry_df"] = edited_quick_df
-        
-        st.success(f"🔍 **Hittade set:** {auto_setname} ({auto_setbet})")
-    else:
-        st.info("💡 Skriv in setnummer/setkod (t.ex. **'SV3'**, **'043/108'** eller **'SV3 043'**) i 'Setnr.' för att identifiera setet.")
+    selected_set = None
+    if matching_sets:
+        # Skapa alternativ till rullistan: "Set-namn (Kortkod / Totalt antal)"
+        set_options = {
+            f"{s.get('name')} ({s.get('ptcgoCode', s.get('id', '')).upper()}) — Total: {s.get('printedTotal', s.get('total', '?'))}": s
+            for s in matching_sets
+        }
+        chosen_label = st.selectbox("Välj matchande Set:", options=list(set_options.keys()))
+        selected_set = set_options[chosen_label]
+    elif reg_setnr_raw:
+        st.warning("Hittade inga set som har så många kort. Kontrollera numret eller välj manuellt nedan.")
+
+    # Övriga fält för kortet
+    c4, c5, c6, c7 = st.columns(4)
+    with c4:
+        reg_ovrigt = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"])
+    with c5:
+        reg_skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"])
+    with c6:
+        reg_kopt = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5, format="%.2f")
+    with c7:
+        reg_varde = st.number_input("Värde (EUR)", min_value=0.0, value=0.0, step=0.5, format="%.2f")
 
     if st.button("➕ Registrera kort i samlingen", type="primary", use_container_width=True):
-        if not input_name:
-            st.warning("Fyll i namn på kortet för att registrera.")
+        if not reg_name:
+            st.warning("Du måste fylla i eller välja ett Pokémon-namn.")
         else:
-            k_eur = float(row.get("Köpt (EUR)", 0.0) or 0.0)
-            v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
+            set_bet = ""
+            set_name = ""
             img_url = ""
-            if found_set and "images" in found_set:
-                img_url = found_set["images"].get("small", "")
+
+            if selected_set:
+                set_bet = selected_set.get("ptcgoCode") or selected_set.get("id", "").upper()
+                set_name = selected_set.get("name", "")
+                if "images" in selected_set:
+                    img_url = selected_set["images"].get("small", "")
+
+            next_p_nr = len(collection) + 1
 
             new_card = {
                 "_id": str(uuid.uuid4()),
                 "Bild": img_url,
-                "Pärmnummer": int(row.get("Pärmnr.", len(collection) + 1)),
-                "Språk": row.get("Språk", "ENG"),
-                "Namn": input_name,
-                "Engelskt Namn": input_name,
-                "Setnr.": input_setnr,
-                "SetBet.": row.get("SetBet.", ""),
-                "Set": row.get("Set", ""),
-                "Övrigt": row.get("Övrigt", "Normal"),
-                "Skick": row.get("Skick", "NM"),
-                "Köpt för (EUR)": k_eur,
-                "Köpt för (SEK)": round(k_eur * eur_to_sek, 2),
-                "Värde (EUR)": v_eur,
-                "Värde idag (SEK)": round(v_eur * eur_to_sek, 2),
-                "Google Sök": generate_google_cardmarket_url(input_name, input_setnr, row.get("Set", "")),
+                "Pärmnummer": next_p_nr,
+                "Språk": reg_language,
+                "Namn": reg_name,
+                "Engelskt Namn": reg_name,
+                "Setnr.": reg_setnr_raw,
+                "SetBet.": set_bet,
+                "Set": set_name,
+                "Övrigt": reg_ovrigt,
+                "Skick": reg_skick,
+                "Köpt för (EUR)": reg_kopt,
+                "Köpt för (SEK)": round(reg_kopt * eur_to_sek, 2),
+                "Värde (EUR)": reg_varde,
+                "Värde idag (SEK)": round(reg_varde * eur_to_sek, 2),
+                "Google Sök": generate_google_cardmarket_url(reg_name, reg_setnr_raw, set_name),
                 "Egen Cardmarket Länk": ""
             }
 
             collection.append(new_card)
             save_payload = {"collection": collection, "custom_names": app_data.get("custom_names", [])}
-            success, msg = github_save_file(DATA_FILE_PATH, save_payload, f"Lade till kort: {input_name}")
-            
+            success, msg = github_save_file(DATA_FILE_PATH, save_payload, f"Lade till kort: {reg_name}")
+
             if success:
                 st.session_state["app_data"] = None
-                del st.session_state["quick_entry_df"]
-                st.success(f"Kortet **{input_name}** har lagts till i samlingen!")
+                st.success(f"Kortet **{reg_name}** ({set_name}) registrerades!")
                 st.rerun()
             else:
                 st.error(f"Kunde inte spara till GitHub: {msg}")
