@@ -30,7 +30,7 @@ def fetch_eur_to_sek_rate():
         pass
     return 11.50
 
-# --- RESERV / DEFAULT-LISTA (Körs endast om sets.json saknas helt på GitHub) ---
+# --- RESERV / DEFAULT-LISTA (Körs endast om filer saknas helt på GitHub) ---
 DEFAULT_SETS = [
     {"SetBet": "SV3", "SetName": "Ruler of the Black Flame", "Language": "JPN", "TotalCards": "108", "ReleaseYear": 2023},
     {"SetBet": "OBF", "SetName": "Obsidian Flames", "Language": "ENG", "TotalCards": "230", "ReleaseYear": 2023}
@@ -45,7 +45,15 @@ DEFAULT_POKEMON_NAMES = [
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
 DATA_FILE_PATH = "data.json"
-SETS_FILE_PATH = "sets.json"
+
+# De 4 nya set-filerna
+SET_FILES = [
+    "pokemon_sets_japan_part1.json",
+    "pokemon_sets_japan_part2.json",
+    "pokemon_sets_english.json",
+    "pokemon_sets_egna.json"
+]
+CUSTOM_SETS_FILE_PATH = "pokemon_sets_egna.json"
 
 def github_load_file(file_path, default_content):
     if not GITHUB_TOKEN or not GITHUB_REPO:
@@ -147,7 +155,16 @@ if "app_data" not in st.session_state or st.session_state["app_data"] is None:
     st.session_state["app_data"] = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": DEFAULT_POKEMON_NAMES})
 
 if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
-    st.session_state["sets_data"] = github_load_file(SETS_FILE_PATH, DEFAULT_SETS)
+    combined_sets = []
+    for file_path in SET_FILES:
+        data = github_load_file(file_path, [])
+        if isinstance(data, list):
+            combined_sets.extend(data)
+    
+    if not combined_sets:
+        combined_sets = DEFAULT_SETS
+        
+    st.session_state["sets_data"] = combined_sets
 
 app_data = st.session_state["app_data"]
 sets_db = st.session_state["sets_data"]
@@ -513,8 +530,8 @@ with tab3:
 
 # --- FLIK 4: SET-DATABAS ---
 with tab4:
-    st.subheader("🗂️ Global Set-databas (`sets.json`)")
-    st.caption("Filtrera, redigera och lägg till set. Ändringar du gör här sparas i `sets.json` på GitHub.")
+    st.subheader("🗂️ Global Set-databas")
+    st.caption("Filtrera, redigera och lägg till set. Ändringar du gör här sparas i `pokemon_sets_egna.json` på GitHub.")
 
     col_f1, col_f2 = st.columns(2)
     with col_f1:
@@ -557,22 +574,10 @@ with tab4:
     if st.button("💾 Spara ändringar i Set-databasen", type="primary"):
         edited_list = edited_sets_df.to_dict(orient="records")
         
-        merged_db = []
-        edited_keys = {(r.get("SetBet"), r.get("Language")) for r in edited_list}
-        
-        for r in edited_list:
-            if r.get("SetBet") and r.get("SetName"):
-                merged_db.append(r)
-                
-        for s in sets_db:
-            key = (s.get("SetBet"), s.get("Language"))
-            if key not in edited_keys:
-                merged_db.append(s)
-
-        success, msg = github_save_file(SETS_FILE_PATH, merged_db, "Uppdaterade sets.json manuellt")
+        success, msg = github_save_file(CUSTOM_SETS_FILE_PATH, edited_list, "Uppdaterade set-databasen")
         if success:
             st.session_state["sets_data"] = None
-            st.success("Set-databasen sparades till GitHub!")
+            st.success(f"Ändringarna sparades till {CUSTOM_SETS_FILE_PATH}!")
             st.rerun()
         else:
             st.error(msg)
