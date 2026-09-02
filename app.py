@@ -30,127 +30,61 @@ def fetch_eur_to_sek_rate():
         pass
     return 11.50
 
-# --- LOKAL SET-DATABAS ---
-# Struktur: (SetBet, Fullständigt Namn, Språk, Totalt_antal_kort)
-ALL_SETS = [
-    # JAPANSKA SET (Sun & Moon)
-    ("SM1S", "Collection Sun", "JPN", "060"),
-    ("SM1M", "Collection Moon", "JPN", "060"),
-    ("SM2K", "Islands Await You", "JPN", "050"),
-    ("SM2L", "Alolan Moonlight", "JPN", "050"),
-    ("SM3H", "To Have Seen the Battle Rainbow", "JPN", "051"),
-    ("SM3N", "Darkness that Consumes Light", "JPN", "051"),
-    ("SM4A", "Ultradimensional Beasts", "JPN", "050"),
-    ("SM4S", "Solgaleo-GX & Lunala-GX Deck", "JPN", "050"),
-    ("SM4+", "GX Battle Boost", "JPN", "114"),
-    ("SM8B", "Ultra Shiny GX", "JPN", "150"),
-    ("SM12A", "Tag All Stars", "JPN", "173"),
-    
-    # JAPANSKA SET (Sword & Shield)
-    ("S12A", "VSTAR Universe", "JPN", "172"),
-    ("S11A", "Incandescent Arcana", "JPN", "068"),
-    ("S10B", "Pokémon GO", "JPN", "071"),
-    
-    # JAPANSKA SET (Scarlet & Violet)
-    ("SV1S", "Scarlet ex", "JPN", "078"),
-    ("SV1V", "Violet ex", "JPN", "078"),
-    ("SV2D", "Clay Burst", "JPN", "071"),
-    ("SV2P", "Snow Hazard", "JPN", "071"),
-    ("SV3", "Ruler of the Black Flame", "JPN", "108"),
-    ("SV3A", "Raging Surf", "JPN", "062"),
-    ("SV4A", "Shiny Treasure ex", "JPN", "190"),
-    ("SV5A", "Crimson Haze", "JPN", "066"),
-    ("SV0A", "Battle Academy", "JPN", "066"),
+# --- DEFAULT SET-DATABAS ---
+DEFAULT_SETS = [
+    # JAPANSKA SET
+    {"SetBet": "SM1S", "SetName": "Collection Sun", "Language": "JPN", "TotalCards": "060", "ReleaseYear": 2016},
+    {"SetBet": "SM1M", "SetName": "Collection Moon", "Language": "JPN", "TotalCards": "060", "ReleaseYear": 2016},
+    {"SetBet": "SM2K", "SetName": "Islands Await You", "Language": "JPN", "TotalCards": "050", "ReleaseYear": 2017},
+    {"SetBet": "SM2L", "SetName": "Alolan Moonlight", "Language": "JPN", "TotalCards": "050", "ReleaseYear": 2017},
+    {"SetBet": "SM4A", "SetName": "Ultradimensional Beasts", "Language": "JPN", "TotalCards": "050", "ReleaseYear": 2017},
+    {"SetBet": "S12A", "SetName": "VSTAR Universe", "Language": "JPN", "TotalCards": "172", "ReleaseYear": 2022},
+    {"SetBet": "SV1S", "SetName": "Scarlet ex", "Language": "JPN", "TotalCards": "078", "ReleaseYear": 2023},
+    {"SetBet": "SV1V", "SetName": "Violet ex", "Language": "JPN", "TotalCards": "078", "ReleaseYear": 2023},
+    {"SetBet": "SV3", "SetName": "Ruler of the Black Flame", "Language": "JPN", "TotalCards": "108", "ReleaseYear": 2023},
+    {"SetBet": "SV4A", "SetName": "Shiny Treasure ex", "Language": "JPN", "TotalCards": "190", "ReleaseYear": 2023},
 
-    # ENGELSKA SET (WOTC Klassiker)
-    ("BS", "Base Set", "ENG", "102"),
-    ("JU", "Jungle", "ENG", "064"),
-    ("FO", "Fossil", "ENG", "062"),
-    ("B2", "Base Set 2", "ENG", "130"),
-    ("TR", "Team Rocket", "ENG", "082"),
-    ("GH", "Gym Heroes", "ENG", "132"),
-    ("GC", "Gym Challenge", "ENG", "132"),
-    
-    # ENGELSKA SET (Moderna)
-    ("CIN", "Crimson Invasion", "ENG", "111"),
-    ("SUM", "Sun & Moon Base", "ENG", "149"),
-    ("GRI", "Guardians Rising", "ENG", "145"),
-    ("BUS", "Burning Shadows", "ENG", "147"),
-    ("SSH", "Sword & Shield Base", "ENG", "202"),
-    ("SVI", "Scarlet & Violet Base", "ENG", "198"),
-    ("PAL", "Paldea Evolved", "ENG", "279"),
-    ("OBF", "Obsidian Flames", "ENG", "230"),
-    ("SV3", "Obsidian Flames", "ENG", "230"),
-    ("MEW", "151", "ENG", "207"),
-    ("PAR", "Paradox Rift", "ENG", "266"),
-    ("PAF", "Paldean Fates", "ENG", "245"),
-    ("TEF", "Temporal Forces", "ENG", "218"),
-    ("TWM", "Twilight Masquerade", "ENG", "226"),
-    ("SFA", "Shrouded Fable", "ENG", "099"),
-    ("SCR", "Stellar Crown", "ENG", "175")
+    # ENGELSKA SET
+    {"SetBet": "BS", "SetName": "Base Set", "Language": "ENG", "TotalCards": "102", "ReleaseYear": 1999},
+    {"SetBet": "JU", "SetName": "Jungle", "Language": "ENG", "TotalCards": "064", "ReleaseYear": 1999},
+    {"SetBet": "FO", "SetName": "Fossil", "Language": "ENG", "TotalCards": "062", "ReleaseYear": 1999},
+    {"SetBet": "CIN", "SetName": "Crimson Invasion", "Language": "ENG", "TotalCards": "111", "ReleaseYear": 2017},
+    {"SetBet": "GRI", "SetName": "Guardians Rising", "Language": "ENG", "TotalCards": "145", "ReleaseYear": 2017},
+    {"SetBet": "SVI", "SetName": "Scarlet & Violet Base", "Language": "ENG", "TotalCards": "198", "ReleaseYear": 2023},
+    {"SetBet": "PAL", "SetName": "Paldea Evolved", "Language": "ENG", "TotalCards": "279", "ReleaseYear": 2023},
+    {"SetBet": "OBF", "SetName": "Obsidian Flames", "Language": "ENG", "TotalCards": "230", "ReleaseYear": 2023},
+    {"SetBet": "MEW", "SetName": "151", "Language": "ENG", "TotalCards": "207", "ReleaseYear": 2023}
 ]
 
 DEFAULT_POKEMON_NAMES = [
     "Alolan Raichu", "Pikachu", "Charizard", "Blastoise", "Venusaur", 
-    "Gengar", "Mewtwo", "Mew", "Rayquaza", "Umbreon", "Espeon", "Lugia"
+    "Gengar", "Mewtwo", "Mew", "Rayquaza", "Umbreon", "Espeon", "Lugia", "Togepi"
 ]
-
-def search_sets(input_text, selected_lang):
-    clean_text = str(input_text).strip().lower().replace(" ", "")
-    if not clean_text:
-        return "", ""
-
-    # 1. Matchning på exakt SetBet/Kod (t.ex. "sv3", "sm4a")
-    for bet, name, lang, total in ALL_SETS:
-        if clean_text == bet.lower().replace("+", "plus") or clean_text == bet.lower():
-            return bet, name
-
-    # 2. Om inmatningen innehåller totalantal (t.ex. "016/050" eller "/050")
-    target_total = clean_text
-    if "/" in clean_text:
-        target_total = clean_text.split("/")[-1].strip()
-    numeric_total = target_total.lstrip("0")
-
-    matches = []
-    for bet, name, lang, total in ALL_SETS:
-        if lang == selected_lang:
-            if total == target_total or (numeric_total and total.lstrip("0") == numeric_total):
-                matches.append((bet, name))
-
-    if len(matches) == 1:
-        return matches[0][0], matches[0][1]
-    elif len(matches) > 1:
-        return matches[0][0], matches[0][1] # Väljer första som standard vid krock
-
-    return "", ""
 
 # --- GITHUB INTEGRATION ---
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
-FILE_PATH = "data.json"
+DATA_FILE_PATH = "data.json"
+SETS_FILE_PATH = "sets.json"
 
-def load_data_from_github():
-    default_data = {"collection": [], "custom_names": DEFAULT_POKEMON_NAMES}
+def github_load_file(file_path, default_content):
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        return default_data
-    raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{FILE_PATH}"
+        return default_content
+    raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{file_path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
         res = requests.get(raw_url, headers=headers, params={"t": str(uuid.uuid4())}, timeout=4)
         if res.status_code == 200:
-            data = json.loads(res.text)
-            if "custom_names" not in data:
-                data["custom_names"] = DEFAULT_POKEMON_NAMES
-            return data
+            return json.loads(res.text)
     except Exception:
         pass
-    return default_data
+    return default_content
 
-def save_data_to_github(data_dict):
+def github_save_file(file_path, data_dict, commit_message):
     if not GITHUB_TOKEN or not GITHUB_REPO:
         return False, "GITHUB_TOKEN eller GITHUB_REPO saknas i Secrets!"
     
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
@@ -168,7 +102,7 @@ def save_data_to_github(data_dict):
     encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
     
     payload = {
-        "message": "Uppdaterade samlingsdata via Streamlit",
+        "message": commit_message,
         "content": encoded_content
     }
     if sha:
@@ -195,14 +129,50 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
+def search_sets_db(input_text, selected_lang, sets_db):
+    clean_text = str(input_text).strip().lower().replace(" ", "")
+    if not clean_text:
+        return "", ""
+
+    # Filter baserat på vald språkmiljö först
+    lang_sets = [s for s in sets_db if s.get("Language") == selected_lang]
+
+    # 1. Matchning på exakt SetBet (t.ex. "sv3") inom valt språk
+    for s in lang_sets:
+        if clean_text == str(s.get("SetBet", "")).lower().replace("+", "plus") or clean_text == str(s.get("SetBet", "")).lower():
+            return s.get("SetBet", ""), s.get("SetName", "")
+
+    # 2. Matchning på Totalkort (t.ex. "043/108" -> "108")
+    target_total = clean_text
+    if "/" in clean_text:
+        target_total = clean_text.split("/")[-1].strip()
+    numeric_total = target_total.lstrip("0")
+
+    for s in lang_sets:
+        tot = str(s.get("TotalCards", "")).strip()
+        if tot == target_total or (numeric_total and tot.lstrip("0") == numeric_total):
+            return s.get("SetBet", ""), s.get("SetName", "")
+
+    # Fallback: Om inte hittat i valt språk, sök globalt på SetBet
+    for s in sets_db:
+        if clean_text == str(s.get("SetBet", "")).lower():
+            return s.get("SetBet", ""), s.get("SetName", "")
+
+    return "", ""
+
 # --- INITIERA SESSION STATE ---
 if "editor_version" not in st.session_state:
     st.session_state["editor_version"] = 0
 
 if "app_data" not in st.session_state or st.session_state["app_data"] is None:
-    st.session_state["app_data"] = load_data_from_github()
+    st.session_state["app_data"] = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": DEFAULT_POKEMON_NAMES})
+
+if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
+    st.session_state["sets_data"] = github_load_file(SETS_FILE_PATH, DEFAULT_SETS)
 
 app_data = st.session_state["app_data"]
+sets_db = st.session_state["sets_data"]
+
 if "collection" not in app_data:
     app_data["collection"] = []
 if "custom_names" not in app_data or not app_data["custom_names"]:
@@ -212,7 +182,7 @@ app_data["collection"] = fix_existing_collection(app_data["collection"])
 eur_to_sek = fetch_eur_to_sek_rate()
 
 # --- LAYOUT & TABS ---
-tab1, tab2, tab3 = st.tabs(["📊 Samling", "⚡ Snabb-registrering", "⚙️ Namn-inställningar"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Samling", "⚡ Snabb-registrering", "⚙️ Namn-inställningar", "🗂️ Set-databas"])
 
 # --- FLIK 1: SAMLING ---
 with tab1:
@@ -227,6 +197,7 @@ with tab1:
             if st.button("🔄 Uppdatera", help="Hämta senast gällande växelkurs"):
                 fetch_eur_to_sek_rate.clear()
                 st.session_state["app_data"] = None
+                st.session_state["sets_data"] = None
                 st.rerun()
 
     collection = sorted(app_data.get("collection", []), key=lambda x: int(x.get("Pärmnummer", 0) or 0))
@@ -369,7 +340,7 @@ with tab1:
 
                     app_data["collection"] = processed_list
                     save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", DEFAULT_POKEMON_NAMES)}
-                    success, msg = save_data_to_github(save_payload)
+                    success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling")
                     
                     if success:
                         st.session_state["app_data"] = None 
@@ -387,10 +358,10 @@ with tab1:
     else:
         st.info("Samlingen är tom. Gå till fliken 'Snabb-registrering'.")
 
-# --- FLIK 2: DIREKT-REGISTRERING (TABELLFORM) ---
+# --- FLIK 2: DIREKT-REGISTRERING ---
 with tab2:
     st.subheader("⚡ Snabb-registrering via direktredigering")
-    st.caption("Fyll i raden nedan och tryck på Enter. SetBet och Set-namn beräknas automatiskt utifrån Språk och Setnr.")
+    st.caption("Fyll i raden nedan och tryck Enter. SetBet och Set-namn beräknas automatiskt utifrån Språk och Setnr.")
 
     if "new_card_state" not in st.session_state:
         next_parm = len(app_data.get("collection", [])) + 1
@@ -398,7 +369,7 @@ with tab2:
             "Pärmnummer": next_parm,
             "Språk": "ENG",
             "Namn": app_data["custom_names"][0] if app_data["custom_names"] else "Pikachu",
-            "Setnr.": "016/050",
+            "Setnr.": "",
             "SetBet.": "",
             "Set": "",
             "Övrigt": "Normal",
@@ -411,7 +382,7 @@ with tab2:
 
     curr_lang = reg_df.at[0, "Språk"]
     curr_num = reg_df.at[0, "Setnr."]
-    auto_bet, auto_set = search_sets(curr_num, curr_lang)
+    auto_bet, auto_set = search_sets_db(curr_num, curr_lang, sets_db)
 
     reg_df.at[0, "SetBet."] = auto_bet
     reg_df.at[0, "Set"] = auto_set
@@ -442,7 +413,7 @@ with tab2:
     if auto_set:
         st.success(f" Hittade automatisk matchning: **{auto_set}** (`{auto_bet}`)")
     else:
-        st.info("💡 Skriv in ett setnummer eller setkod (t.ex. 'SV3' eller '016/050') i cellen 'Setnr.' för att hitta setet.")
+        st.info("💡 Skriv in ett setnummer eller setkod (t.ex. 'SV3' eller '043/108') i 'Setnr.' för att identifiera setet.")
 
     st.divider()
 
@@ -490,7 +461,7 @@ with tab2:
             card["Pärmnummer"] = idx
 
         save_payload = {"collection": sorted_coll, "custom_names": app_data.get("custom_names", DEFAULT_POKEMON_NAMES)}
-        success, msg = save_data_to_github(save_payload)
+        success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Lade till nytt kort")
 
         if success:
             st.session_state["app_data"] = None
@@ -512,7 +483,7 @@ with tab2:
         else:
             st.error(f"Kunde inte spara till GitHub: {msg}")
 
-# --- FLIK 3: INSTÄLLNINGAR / NAMN ---
+# --- FLIK 3: NAMN-INSTÄLLNINGAR ---
 with tab3:
     st.subheader("⚙️ Pokémon-namn i Rullistan")
     st.caption("Hantera listan över namn som ska synas i rullistan när du registrerar nya kort.")
@@ -532,7 +503,7 @@ with tab3:
                 names_list.sort()
                 app_data["custom_names"] = names_list
                 save_payload = {"collection": app_data.get("collection", []), "custom_names": names_list}
-                success, msg = save_data_to_github(save_payload)
+                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade namnlista")
                 if success:
                     st.success(f"Lade till '{clean_n}'!")
                     st.rerun()
@@ -541,7 +512,6 @@ with tab3:
 
     st.divider()
 
-    st.markdown("**Befintliga namn i listan:**")
     names_df = pd.DataFrame({"Pokémon Name": names_list})
     edited_names = st.data_editor(
         names_df,
@@ -555,9 +525,77 @@ with tab3:
         updated_names = sorted(list(set(updated_names)))
         app_data["custom_names"] = updated_names
         save_payload = {"collection": app_data.get("collection", []), "custom_names": updated_names}
-        success, msg = save_data_to_github(save_payload)
+        success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Redigerade namnlista")
         if success:
             st.success("Namnlistan uppdaterades!")
+            st.rerun()
+        else:
+            st.error(msg)
+
+# --- FLIK 4: SET-DATABAS ---
+with tab4:
+    st.subheader("🗂️ Global Set-databas (`sets.json`)")
+    st.caption("Filtrera, redigera och lägg till set. Ändringar du gör här sparas i `sets.json` på GitHub och skrivs inte över vid framtida automatiska skriptuppdateringar.")
+
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        filter_lang = st.selectbox("Filtrera på språk:", ["ALLA", "JPN", "ENG", "SWE", "GER", "FRA", "ITA", "KOR", "SPA", "POR", "ZHT"])
+    with col_f2:
+        filter_search = st.text_input("Sök i set-namn / kod:", placeholder="T.ex. sv3 eller Ruler")
+
+    sets_df = pd.DataFrame(sets_db)
+    
+    for c in ["SetBet", "SetName", "Language", "TotalCards", "ReleaseYear"]:
+        if c not in sets_df.columns:
+            sets_df[c] = ""
+
+    filtered_df = sets_df.copy()
+    if filter_lang != "ALLA":
+        filtered_df = filtered_df[filtered_df["Language"] == filter_lang]
+    if filter_search.strip():
+        q = filter_search.strip().lower()
+        filtered_df = filtered_df[
+            filtered_df["SetBet"].astype(str).str.lower().str.contains(q) | 
+            filtered_df["SetName"].astype(str).str.lower().str.contains(q)
+        ]
+
+    sets_config = {
+        "SetBet": st.column_config.TextColumn("SetBet (Setkod)", width="small"),
+        "SetName": st.column_config.TextColumn("Set (Fullständigt Namn)", width="large"),
+        "Language": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width="small"),
+        "TotalCards": st.column_config.TextColumn("Maxantal kort", width="small"),
+        "ReleaseYear": st.column_config.NumberColumn("Utgivningsår", format="%d", step=1, width="small")
+    }
+
+    edited_sets_df = st.data_editor(
+        filtered_df,
+        column_config=sets_config,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="sets_db_editor"
+    )
+
+    if st.button("💾 Spara ändringar i Set-databasen", type="primary"):
+        # Slå ihop de ändrade raderna med resten av databasen
+        edited_list = edited_sets_df.to_dict(orient="records")
+        
+        # Ersätt/uppdatera rader i fulla databasen
+        merged_db = []
+        edited_keys = {(r.get("SetBet"), r.get("Language")) for r in edited_list}
+        
+        for r in edited_list:
+            if r.get("SetBet") and r.get("SetName"):
+                merged_db.append(r)
+                
+        for s in sets_db:
+            key = (s.get("SetBet"), s.get("Language"))
+            if key not in edited_keys:
+                merged_db.append(s)
+
+        success, msg = github_save_file(SETS_FILE_PATH, merged_db, "Uppdaterade sets.json manuellt")
+        if success:
+            st.session_state["sets_data"] = None
+            st.success("Set-databasen sparades till GitHub!")
             st.rerun()
         else:
             st.error(msg)
