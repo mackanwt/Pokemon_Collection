@@ -140,7 +140,7 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
-# --- OPTIMERAD OCH TILLFÖRLITLIG SÖKFUNKTION ---
+# --- KORRIGERAD SÖKFUNKTION FÖR TCGDEX ---
 @st.cache_data(ttl=3600, max_entries=100)
 def search_pokemon_cards(query):
     if not query or len(query.strip()) < 2:
@@ -154,7 +154,6 @@ def search_pokemon_cards(query):
     if not words:
         return []
 
-    # Särskilj siffror från bokstäver/text
     numbers = [w.lstrip("0") for w in words if w.isdigit()]
     text_words = [w for w in words if not w.isdigit()]
 
@@ -164,12 +163,12 @@ def search_pokemon_cards(query):
 
     LANG_CODES = [("en", "ENG"), ("ja", "JPN"), ("fr", "FRA"), ("de", "GER")]
 
-    # Sökterm som skickas till TCGdex API (textordet, t.ex. "raichu")
+    # Huvudsökord till API:et (prioritera text framför siffror)
     search_term = text_words[0] if text_words else words[0]
 
     for lang_key, lang_code in LANG_CODES:
         try:
-            # 1. Om det är en sökning som kan vara ett ID (t.ex. "sm4a 016" -> "sm4a-016" eller "sm4a-16")
+            # 1. Om sökningen har flera ord (t.ex. "sm4a 016" -> sm4a-016)
             if len(words) >= 2:
                 possible_id = f"{words[0]}-{words[1]}"
                 url_direct = f"https://api.tcgdex.net/v2/{lang_key}/cards/{urllib.parse.quote(possible_id)}"
@@ -182,19 +181,18 @@ def search_pokemon_cards(query):
                         raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
                         full_set_name, set_code = get_set_details_sync(raw_set_id)
                         
-                        results.append({
+                        return [{
                             "id": f"{card_id}_{lang_code}",
                             "name": item.get("name") or "",
                             "eng_name": item.get("name") or "",
                             "set_code": set_code or "",
                             "set_name": full_set_name or "",
-                            "number": str(item.get("localId") or ""),
+                            "number": str(item.get("localId") or card_id.split("-")[-1]),
                             "image_url": f"{img_base}/high.png" if img_base else "",
                             "default_lang": lang_code
-                        })
-                        return results
+                        }]
 
-            # 2. Riktad sökning på namnet mot TCGdex API
+            # 2. Sök namn på API:et
             url_search = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(search_term)}"
             res_search = requests.get(url_search, headers=headers, timeout=3)
             
@@ -204,15 +202,18 @@ def search_pokemon_cards(query):
                     for item in cards_list:
                         c_id = str(item.get("id") or "").lower()
                         c_name = str(item.get("name") or "").lower()
-                        c_local = str(item.get("localId") or "").lower().lstrip("0")
                         
-                        # Kontrollera att alla textord finns med i namnet eller ID:t
+                        # Extrahera kortnumret från slutet av ID-strängen (t.ex. "sm3.5-31" -> "31")
+                        id_parts = c_id.split("-")
+                        id_number = id_parts[-1].lstrip("0") if len(id_parts) > 1 else ""
+
+                        # Matcha alla textord i namnet eller ID:t
                         text_match = all(tw in c_name or tw in c_id for tw in text_words)
                         
-                        # Om siffror/nummer angavs, kontrollera att numret matchar kortets localId
+                        # Matcha siffer-sökord mot slutet av ID-strängen
                         num_match = True
                         if numbers:
-                            num_match = any(num == c_local or num in c_id.split("-")[-1] for num in numbers)
+                            num_match = any(num == id_number or f"-{num}" in c_id for num in numbers)
 
                         if text_match and num_match:
                             card_id = str(item.get("id") or "")
@@ -224,13 +225,15 @@ def search_pokemon_cards(query):
                                 raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
                                 full_set_name, set_code = get_set_details_sync(raw_set_id)
 
+                                card_num = id_parts[-1] if len(id_parts) > 1 else ""
+
                                 results.append({
                                     "id": unique_key,
                                     "name": item.get("name") or "",
                                     "eng_name": item.get("name") or "",
                                     "set_code": set_code or "",
                                     "set_name": full_set_name or "",
-                                    "number": str(item.get("localId") or ""),
+                                    "number": card_num,
                                     "image_url": f"{img_base}/high.png" if img_base else "",
                                     "default_lang": lang_code
                                 })
