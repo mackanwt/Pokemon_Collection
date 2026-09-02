@@ -273,6 +273,7 @@ with tab1:
         df["Bild"] = df["Bild"].fillna("").astype(str)
         df["Värde (EUR)"] = pd.to_numeric(df["Värde (EUR)"], errors='coerce').fillna(0.0)
         df["Köpt för (EUR)"] = pd.to_numeric(df["Köpt för (EUR)"], errors='coerce').fillna(0.0)
+        df["Egen Cardmarket Länk"] = df["Egen Cardmarket Länk"].fillna("").astype(str)
         
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * eur_to_sek).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * eur_to_sek).round(2)
@@ -386,6 +387,7 @@ with tab1:
                                     target_nr -= 1
 
                         row["Pärmnummer"] = target_nr
+                        row["Egen Cardmarket Länk"] = str(row.get("Egen Cardmarket Länk") or "").strip()
                         
                         k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
                         v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
