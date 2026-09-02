@@ -13,7 +13,6 @@ GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 GITHUB_REPO = st.secrets["GITHUB_REPO"]
 DATA_FILE_PATH = "pokemon_collection_data.json"
 
-# De 4 set-filerna
 SET_FILES = [
     "pokemon_sets_japan_part1.json",
     "pokemon_sets_japan_part2.json",
@@ -27,7 +26,7 @@ DEFAULT_SETS = [
     {"id": "sv3", "ptcgoCode": "OBF", "name": "Obsidian Flames", "language": "ENG", "total": 197}
 ]
 
-# --- GITHUB FUNKTIONER ---
+# --- SÄKER GITHUB-FUNKTION ---
 def github_load_file(file_path: str, default_data: Any) -> Any:
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
@@ -39,7 +38,7 @@ def github_load_file(file_path: str, default_data: Any) -> Any:
                 return default_data
             return json.loads(content)
         except Exception as e:
-            st.error(f"Kunde inte läsa JSON-filen '{file_path}': {e}")
+            st.error(f"⚠️ JSON-fel i filen **{file_path}**: Kontrollera att filen har korrekt syntax (t.ex. saknade kommatecken). Detalj: {e}")
             return default_data
     return default_data
 
@@ -82,15 +81,20 @@ def generate_google_cardmarket_url(name, setnr, setname):
     q = f"{name} {setnr} {setname} site:cardmarket.com".strip()
     return f"https://www.google.com/search?q={q.replace(' ', '+')}"
 
-# --- INITIALISERA SESSION STATE ---
+# --- LADDA SAMLING OCH NAMN SEPARAT ---
 if "app_data" not in st.session_state or st.session_state["app_data"] is None:
-    st.session_state["app_data"] = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": []})
+    loaded_data = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": []})
+    # Skydda mot att samlingen nollställs om filen tillfälligt inte nås
+    if not isinstance(loaded_data, dict) or "collection" not in loaded_data:
+        loaded_data = {"collection": [], "custom_names": []}
+    st.session_state["app_data"] = loaded_data
+
 app_data = st.session_state["app_data"]
 
 if "editor_version" not in st.session_state:
     st.session_state["editor_version"] = 1
 
-# --- LÄS IN ALLA SET-FILER OCH NORMALISERA DATA ---
+# --- LADDA SET-FILER ---
 if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
     combined_sets = []
     seen_keys = set()
@@ -99,19 +103,16 @@ if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
         data = github_load_file(file_path, [])
         if isinstance(data, list):
             for item in data:
-                # Normalisera fältnamn (stor/liten bokstav)
                 set_bet = str(item.get("SetBet") or item.get("ptcgoCode") or item.get("id") or "").strip()
                 set_name = str(item.get("SetName") or item.get("name") or "").strip()
                 lang = str(item.get("Language") or item.get("language") or item.get("Språk") or "ENG").strip().upper()
                 
-                # Säkra att TotalCards blir ett nummer
                 raw_total = item.get("TotalCards") or item.get("printedTotal") or item.get("total") or item.get("Maxantal kort") or 0
                 try:
                     total_cards = int(str(raw_total).strip())
                 except ValueError:
                     total_cards = 0
 
-                # Undvik dubbletter baserat på SetBet + Språk
                 unique_key = f"{set_bet}_{lang}"
                 if set_bet and unique_key not in seen_keys:
                     seen_keys.add(unique_key)
@@ -130,11 +131,7 @@ if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
 
     st.session_state["sets_data"] = combined_sets
 
-# Sätt sets_db till de laddade seten
 sets_db = st.session_state["sets_data"]
-
-# --- TABBAR ---
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Samling", "⚡ Snabb-registrering", "⚙️ Namn-inställningar", "📁 Set-databas"])
 
 # --- FLIK 1: SAMLING ---
 with tab1:
