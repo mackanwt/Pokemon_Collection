@@ -248,6 +248,55 @@ with tab1:
             st.dataframe(display_df[columns_order], column_config=column_config, use_container_width=True, hide_index=True)
         
         else:
+            with col_act2:
+                if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
+                    raw_edited = edited_df.to_dict(orient="records")
+                    
+                    processed_list = []
+                    for row in raw_edited:
+                        c_id = row.get("_id") or str(uuid.uuid4())
+                        
+                        k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
+                        v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
+                        s_name = row.get("Engelskt Namn") or row.get("Namn") or ""
+                        
+                        clean_card = {
+                            "_id": c_id,
+                            "Bild": str(row.get("Bild") or "").strip(),
+                            "Pärmnummer": int(row.get("Pärmnummer", 0) or 0),
+                            "Språk": row.get("Språk", "ENG"),
+                            "Namn": row.get("Namn", ""),
+                            "Engelskt Namn": s_name,
+                            "Setnr.": str(row.get("Setnr.") or "").strip(),
+                            "SetBet.": str(row.get("SetBet.") or "").strip(),
+                            "Set": str(row.get("Set") or "").strip(),
+                            "Övrigt": row.get("Övrigt", "Normal"),
+                            "Skick": row.get("Skick", "NM"),
+                            "Köpt för (EUR)": k_eur,
+                            "Köpt för (SEK)": round(k_eur * eur_to_sek, 2),
+                            "Värde (EUR)": v_eur,
+                            "Värde idag (SEK)": round(v_eur * eur_to_sek, 2),
+                            "Google Sök": generate_google_cardmarket_url(s_name, row.get("Setnr.", ""), row.get("Set", "")),
+                            "Egen Cardmarket Länk": str(row.get("Egen Cardmarket Länk") or "").strip()
+                        }
+                        processed_list.append(clean_card)
+
+                    processed_list.sort(key=lambda x: int(x.get("Pärmnummer", 0)))
+                    for seq_nr, card in enumerate(processed_list, start=1):
+                        card["Pärmnummer"] = seq_nr
+
+                    app_data["collection"] = processed_list
+                    save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", DEFAULT_POKEMON_NAMES)}
+                    success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling och tog bort rad(er)")
+                    
+                    if success:
+                        st.session_state["app_data"] = None 
+                        st.session_state["editor_version"] += 1
+                        st.success("Ändringarna sparades!")
+                        st.rerun()
+                    else:
+                        st.error(f"Kunde inte spara till GitHub: {msg}")
+
             column_config_edit = {
                 "_id": None,
                 "Bild": st.column_config.TextColumn("Bild-URL", width=100),
@@ -278,56 +327,7 @@ with tab1:
                 key=editor_key
             )
 
-with col_act2:
-                if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
-                    raw_edited = edited_df.to_dict(orient="records")
-                    
-                    processed_list = []
-                    for row in raw_edited:
-                        # Rensa och säkerställ giltigt ID
-                        c_id = row.get("_id") or str(uuid.uuid4())
-                        
-                        k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
-                        v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
-                        s_name = row.get("Engelskt Namn") or row.get("Namn") or ""
-                        
-                        clean_card = {
-                            "_id": c_id,
-                            "Bild": str(row.get("Bild") or "").strip(),
-                            "Pärmnummer": int(row.get("Pärmnummer", 0) or 0),
-                            "Språk": row.get("Språk", "ENG"),
-                            "Namn": row.get("Namn", ""),
-                            "Engelskt Namn": s_name,
-                            "Setnr.": str(row.get("Setnr.") or "").strip(),
-                            "SetBet.": str(row.get("SetBet.") or "").strip(),
-                            "Set": str(row.get("Set") or "").strip(),
-                            "Övrigt": row.get("Övrigt", "Normal"),
-                            "Skick": row.get("Skick", "NM"),
-                            "Köpt för (EUR)": k_eur,
-                            "Köpt för (SEK)": round(k_eur * eur_to_sek, 2),
-                            "Värde (EUR)": v_eur,
-                            "Värde idag (SEK)": round(v_eur * eur_to_sek, 2),
-                            "Google Sök": generate_google_cardmarket_url(s_name, row.get("Setnr.", ""), row.get("Set", "")),
-                            "Egen Cardmarket Länk": str(row.get("Egen Cardmarket Länk") or "").strip()
-                        }
-                        processed_list.append(clean_card)
-
-                    # Sortera utifrån det valda pärmnumret och numrera om 1, 2, 3... sekventiellt
-                    processed_list.sort(key=lambda x: int(x.get("Pärmnummer", 0)))
-                    for seq_nr, card in enumerate(processed_list, start=1):
-                        card["Pärmnummer"] = seq_nr
-
-                    app_data["collection"] = processed_list
-                    save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", DEFAULT_POKEMON_NAMES)}
-                    success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling och tog bort rad(er)")
-                    
-                    if success:
-                        st.session_state["app_data"] = None 
-                        st.session_state["editor_version"] += 1
-                        st.success("Ändringarna sparades!")
-                        st.rerun()
-                    else:
-                        st.error(f"Kunde inte spara till GitHub: {msg}")
+        st.divider()
         c1, c2, c3 = st.columns(3)
         c1.metric("Totalt antal kort", len(df))
         c2.metric("Totalt värde (SEK)", f"{df['Värde idag (SEK)'].sum():,.2f} kr")
