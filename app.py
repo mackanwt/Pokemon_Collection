@@ -33,8 +33,14 @@ def github_load_file(file_path: str, default_data: Any) -> Any:
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
-        content = base64.b64decode(response.json()['content']).decode('utf-8')
-        return json.loads(content)
+        try:
+            content = base64.b64decode(response.json()['content']).decode('utf-8')
+            if not content.strip():
+                return default_data
+            return json.loads(content)
+        except Exception as e:
+            st.error(f"Kunde inte läsa JSON-filen '{file_path}': {e}")
+            return default_data
     return default_data
 
 def github_save_file(file_path: str, content: Any, commit_message: str) -> Tuple[bool, str]:
