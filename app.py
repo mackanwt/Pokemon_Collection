@@ -38,7 +38,7 @@ def github_load_file(file_path: str, default_data: Any) -> Any:
                 return default_data
             return json.loads(content)
         except Exception as e:
-            st.error(f"⚠️ JSON-fel i filen **{file_path}**: Kontrollera att filen har korrekt syntax. Detalj: {e}")
+            st.error(f"⚠️ JSON-fel i filen **{file_path}**: Kontrollera syntaxen. Detalj: {e}")
             return default_data
     return default_data
 
@@ -420,7 +420,7 @@ with tab3:
             current_names.sort()
             app_data["custom_names"] = current_names
             save_payload = {"collection": app_data.get("collection", []), "custom_names": current_names}
-            success, msg = github_save_file(DATA_FILE_PATH, save_payload, fukt="Lade till namn: {new_custom_name}")
+            success, msg = github_save_file(DATA_FILE_PATH, save_payload, f"Lade till namn: {new_custom_name}")
             if success:
                 st.session_state["app_data"] = None
                 st.success(f"Namnet '{new_custom_name}' lades till!")
@@ -442,9 +442,14 @@ with tab3:
 # --- FLIK 4: SET-DATABAS ---
 with tab4:
     st.subheader("📁 Tillgängliga Set i Databasen")
-    st.caption("Här ser du alla inlästa set för både engelska och japanska.")
+    st.caption("Filtrera och inspektera inlästa set per språk.")
+
+    db_lang_filter = st.selectbox("Välj språk att visa:", ["Alla", "ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], key="db_lang_filter")
+
     if sets_db:
         sets_df = pd.DataFrame(sets_db)
+        if db_lang_filter != "Alla" and "language" in sets_df.columns:
+            sets_df = sets_df[sets_df["language"] == db_lang_filter]
         st.dataframe(sets_df, use_container_width=True, hide_index=True)
     else:
         st.info("Inga set hittades.")
