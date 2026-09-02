@@ -465,7 +465,8 @@ with tab3:
     st.subheader("⚙️ Pokémon-namn i Rullistan")
     st.caption("Hantera listan över namn som ska synas i rullistan när du registrerar nya kort.")
 
-    names_list = app_data.get("custom_names", DEFAULT_POKEMON_NAMES)
+    # Hämtar sparade namn eller tom lista (utan återställning)
+    names_list = app_data.get("custom_names", [])
     
     col_add1, col_add2 = st.columns([3, 1])
     with col_add1:
@@ -482,7 +483,7 @@ with tab3:
                 save_payload = {"collection": app_data.get("collection", []), "custom_names": names_list}
                 success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade namnlista")
                 if success:
-                    st.session_state["app_data"] = None  # Rensar cachen så nya listan hämtas
+                    st.session_state["app_data"] = None  # Tvingar cachen att uppdateras från GitHub
                     st.success(f"Lade till '{clean_n}'!")
                     st.rerun()
                 else:
@@ -505,7 +506,7 @@ with tab3:
         save_payload = {"collection": app_data.get("collection", []), "custom_names": updated_names}
         success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Redigerade namnlista")
         if success:
-            st.session_state["app_data"] = None  # Rensar cachen så raderingarna sparas på riktigt
+            st.session_state["app_data"] = None  # Rensar cachen så raderingarna sparas permanent
             st.success("Namnlistan uppdaterades!")
             st.rerun()
         else:
