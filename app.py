@@ -140,7 +140,7 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
-# --- ÅTERSTÄLLD OCH ÅTGÄRDAD SÖKFUNKTION ---
+# --- Blixtsnabb och flexibel sökfunktion ---
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
     if not query:
@@ -150,7 +150,17 @@ def search_pokemon_cards(query):
     if "/" in query_clean:
         query_clean = query_clean.split("/")[0].strip()
 
-    search_words = [w for w in re.split(r'\s+', query_clean) if w]
+    words = [w for w in re.split(r'\s+', query_clean) if w]
+    if not words:
+        return []
+
+    # Särskilj siffror/nummer från namnord
+    numbers = [w.lstrip("0") for w in words if w.isdigit()]
+    text_words = [w for w in words if not w.isdigit()]
+    
+    # Söktermen som skickas till API:et (prioritera textordet, t.ex. "raichu")
+    main_search_term = text_words[0] if text_words else words[0]
+
     headers = {'User-Agent': 'Mozilla/5.0'}
     results = []
     seen_ids = set()
@@ -160,9 +170,10 @@ def search_pokemon_cards(query):
         "es": "SPA", "it": "ITA", "pt": "POR", "ko": "KOR", "zh-tw": "ZHT"
     }
 
+    # Hämta engelska namn-mappningen snabbt
     eng_cards_map = {}
     try:
-        res_eng = requests.get("https://api.tcgdex.net/v2/en/cards", headers=headers, timeout=3)
+        res_eng = requests.get(f"https://api.tcgdex.net/v2/en/cards?name={urllib.parse.quote(main_search_term)}", headers=headers, timeout=3)
         if res_eng.status_code == 200:
             for c in res_eng.json():
                 if c.get("id"):
@@ -170,57 +181,55 @@ def search_pokemon_cards(query):
     except Exception:
         pass
 
+    # Sök över språken med direkt-sökning i API:et
     for lang_key, lang_code in LANG_CODES.items():
         try:
-            url_tcgdex = f"https://api.tcgdex.net/v2/{lang_key}/cards"
+            url_tcgdex = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(main_search_term)}"
             res_dex = requests.get(url_tcgdex, headers=headers, timeout=3)
             
             if res_dex.status_code == 200:
                 cards_list = res_dex.json()
-                for item in cards_list:
-                    c_id = str(item.get("id") or "").lower()
-                    c_name = str(item.get("name") or "").lower()
-                    c_local = str(item.get("localId") or "").lower()
-                    
-                    matches_all = True
-                    for w in search_words:
-                        w_clean = w.lstrip("0")
+                if isinstance(cards_list, list):
+                    for item in cards_list:
+                        c_id = str(item.get("id") or "").lower()
+                        c_name = str(item.get("name") or "").lower()
+                        c_local = str(item.get("localId") or "").lower()
                         c_local_clean = c_local.lstrip("0")
                         
-                        in_id = w in c_id
-                        in_name = w in c_name
-                        in_local = (w in c_local) or (w_clean != "" and w_clean in c_local_clean)
+                        # Matcha textord mot namn/ID
+                        text_matches = all(w in c_name or w in c_id for w in text_words)
                         
-                        if not (in_id or in_name or in_local):
-                            matches_all = False
-                            break
-                    
-                    if matches_all:
-                        card_id = str(item.get("id") or "")
-                        unique_key = f"{card_id}_{lang_code}"
-                        
-                        if unique_key not in seen_ids:
-                            seen_ids.add(unique_key)
-                            img_base = item.get("image") or ""
-                            img_url = f"{img_base}/high.png" if img_base else ""
+                        # Matcha nummer mot localId om ett nummer angavs i sökningen
+                        num_matches = True
+                        if numbers:
+                            num_matches = any(n in c_local or n == c_local_clean for n in numbers)
                             
-                            raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
-                            full_set_name, set_code = get_set_details_sync(raw_set_id)
+                        if text_matches and num_matches:
+                            card_id = str(item.get("id") or "")
+                            unique_key = f"{card_id}_{lang_code}"
                             
-                            eng_name = eng_cards_map.get(card_id, item.get("name") or "")
+                            if unique_key not in seen_ids:
+                                seen_ids.add(unique_key)
+                                img_base = item.get("image") or ""
+                                img_url = f"{img_base}/high.png" if img_base else ""
+                                
+                                raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
+                                full_set_name, set_code = get_set_details_sync(raw_set_id)
+                                
+                                eng_name = eng_cards_map.get(card_id, item.get("name") or "")
 
-                            results.append({
-                                "id": unique_key,
-                                "name": item.get("name") or "",
-                                "eng_name": eng_name,
-                                "set_code": set_code or "",
-                                "set_name": full_set_name or "",
-                                "number": c_local,
-                                "image_url": img_url,
-                                "default_lang": lang_code
-                            })
-                            if len(results) >= 20:
-                                break
+                                results.append({
+                                    "id": unique_key,
+                                    "name": item.get("name") or "",
+                                    "eng_name": eng_name,
+                                    "set_code": set_code or "",
+                                    "set_name": full_set_name or "",
+                                    "number": c_local,
+                                    "image_url": img_url,
+                                    "default_lang": lang_code
+                                })
+                                if len(results) >= 20:
+                                    break
         except Exception:
             pass
         if len(results) >= 20:
