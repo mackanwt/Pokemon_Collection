@@ -1,184 +1,134 @@
 import streamlit as st
 import pandas as pd
 import json
-import base64
 import requests
-from datetime import date
-import urllib.parse
-import re
+import base64
 import uuid
+from typing import List, Dict, Any, Tuple
 
-# --- 0. PAGE-KONFIGURATION ---
-st.set_page_config(
-    page_title="Pokémon Samling", 
-    page_icon="🎴",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+# --- KONFIGURATION ---
+st.set_page_config(page_title="Min Pokémon-samling", layout="wide")
 
-# --- VALUTAKURS-FUNKTION ---
-@st.cache_data(ttl=86400)
-def fetch_eur_to_sek_rate():
-    try:
-        url = "https://open.er-api.com/v6/latest/EUR"
-        res = requests.get(url, timeout=3)
-        if res.status_code == 200:
-            rate = res.json().get("rates", {}).get("SEK")
-            if rate:
-                return round(float(rate), 4)
-    except Exception:
-        pass
-    return 11.50
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+GITHUB_REPO = st.secrets["GITHUB_REPO"]
+DATA_FILE_PATH = "pokemon_collection_data.json"
 
-# --- RESERV / DEFAULT-LISTA (Körs endast om filer saknas helt på GitHub) ---
-DEFAULT_SETS = [
-    {"SetBet": "SV3", "SetName": "Ruler of the Black Flame", "Language": "JPN", "TotalCards": "108", "ReleaseYear": 2023},
-    {"SetBet": "OBF", "SetName": "Obsidian Flames", "Language": "ENG", "TotalCards": "230", "ReleaseYear": 2023}
-]
-
-DEFAULT_POKEMON_NAMES = [
-    "Alolan Raichu", "Pikachu", "Charizard", "Blastoise", "Venusaur", 
-    "Gengar", "Mewtwo", "Mew", "Rayquaza", "Umbreon", "Espeon", "Lugia", "Togepi"
-]
-
-# --- GITHUB INTEGRATION ---
-GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
-GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")
-DATA_FILE_PATH = "data.json"
-
-# De 4 nya set-filerna
+# De 4 set-filerna
 SET_FILES = [
     "pokemon_sets_japan_part1.json",
     "pokemon_sets_japan_part2.json",
     "pokemon_sets_english.json",
     "pokemon_sets_egna.json"
 ]
-CUSTOM_SETS_FILE_PATH = "pokemon_sets_egna.json"
 
-def github_load_file(file_path, default_content):
-    if not GITHUB_TOKEN or not GITHUB_REPO:
-        return default_content
-    raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{file_path}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    try:
-        res = requests.get(raw_url, headers=headers, params={"t": str(uuid.uuid4())}, timeout=4)
-        if res.status_code == 200:
-            return json.loads(res.text)
-    except Exception:
-        pass
-    return default_content
+DEFAULT_SETS = [
+    {"id": "base1", "ptcgoCode": "BS", "name": "Base Set", "language": "ENG", "total": 102},
+    {"id": "sva", "ptcgoCode": "MEW", "name": "151", "language": "ENG", "total": 165},
+    {"id": "sv3", "ptcgoCode": "OBF", "name": "Obsidian Flames", "language": "ENG", "total": 197}
+]
 
-def github_save_file(file_path, data_dict, commit_message):
-    if not GITHUB_TOKEN or not GITHUB_REPO:
-        return False, "GITHUB_TOKEN eller GITHUB_REPO saknas i Secrets!"
-    
+# --- GITHUB FUNKTIONER ---
+def github_load_file(file_path: str, default_data: Any) -> Any:
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        content = base64.b64decode(response.json()['content']).decode('utf-8')
+        return json.loads(content)
+    return default_data
+
+def github_save_file(file_path: str, content: Any, commit_message: str) -> Tuple[bool, str]:
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     
     sha = None
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        sha = response.json()['sha']
+        
+    encoded_content = base64.b64encode(json.dumps(content, indent=4).encode('utf-8')).decode('utf-8')
+    data = {"message": commit_message, "content": encoded_content}
+    if sha:
+        data["sha"] = sha
+        
+    response = requests.put(url, headers=headers, json=data)
+    if response.status_code in [200, 201]:
+        return True, "Sparat"
+    return False, response.text
+
+# --- VÄXELKURS ---
+@st.cache_data(ttl=3600)
+def fetch_eur_to_sek_rate() -> float:
     try:
-        res = requests.get(url, headers=headers, timeout=4)
-        if res.status_code == 200:
-            sha = res.json().get("sha")
+        url = "https://api.exchangerate-api.com/v4/latest/EUR"
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            return float(resp.json().get("rates", {}).get("SEK", 11.50))
     except Exception:
         pass
-    
-    content_str = json.dumps(data_dict, indent=2, ensure_ascii=False)
-    encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
-    
-    payload = {
-        "message": commit_message,
-        "content": encoded_content
-    }
-    if sha:
-        payload["sha"] = sha
-        
-    try:
-        put_res = requests.put(url, json=payload, headers=headers, timeout=5)
-        if put_res.status_code in [200, 201]:
-            return True, "Sparat!"
-        else:
-            return False, f"GitHub felkod {put_res.status_code}: {put_res.text}"
-    except Exception as e:
-        return False, f"Kunde inte ansluta till GitHub: {str(e)}"
+    return 11.50
 
-def fix_existing_collection(collection_list):
-    for card in collection_list:
-        if "_id" not in card or not card["_id"]:
-            card["_id"] = str(uuid.uuid4())
-    return collection_list
+eur_to_sek = fetch_eur_to_sek_rate()
 
-def generate_google_cardmarket_url(name, number, set_name):
-    safe_name = str(name) if name is not None else ""
-    clean_name = re.sub(r'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9faf]', '', safe_name).strip()
-    query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
-    return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+def generate_google_cardmarket_url(name, setnr, setname):
+    if not name:
+        return ""
+    q = f"{name} {setnr} {setname} site:cardmarket.com".strip()
+    return f"https://www.google.com/search?q={q.replace(' ', '+')}"
 
-def search_sets_db(input_text, selected_lang, sets_db):
-    clean_text = str(input_text).strip().lower().replace(" ", "")
-    if not clean_text:
-        return "", ""
-
-    lang_sets = [s for s in sets_db if s.get("Language") == selected_lang]
-
-    # 1. Matchning på exakt SetBet (t.ex. "sv3") inom valt språk
-    for s in lang_sets:
-        if clean_text == str(s.get("SetBet", "")).lower().replace("+", "plus") or clean_text == str(s.get("SetBet", "")).lower():
-            return s.get("SetBet", ""), s.get("SetName", "")
-
-    # 2. Matchning på Totalkort (t.ex. "043/108" -> "108")
-    target_total = clean_text
-    if "/" in clean_text:
-        target_total = clean_text.split("/")[-1].strip()
-    numeric_total = target_total.lstrip("0")
-
-    for s in lang_sets:
-        tot = str(s.get("TotalCards", "")).strip()
-        if tot == target_total or (numeric_total and tot.lstrip("0") == numeric_total):
-            return s.get("SetBet", ""), s.get("SetName", "")
-
-    # Fallback: Sök globalt om ej hittat i språk
-    for s in sets_db:
-        if clean_text == str(s.get("SetBet", "")).lower():
-            return s.get("SetBet", ""), s.get("SetName", "")
-
-    return "", ""
-
-# --- INITIERA SESSION STATE ---
-if "editor_version" not in st.session_state:
-    st.session_state["editor_version"] = 0
-
+# --- INITIALISERA SESSION STATE ---
 if "app_data" not in st.session_state or st.session_state["app_data"] is None:
     st.session_state["app_data"] = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": []})
+app_data = st.session_state["app_data"]
 
+if "editor_version" not in st.session_state:
+    st.session_state["editor_version"] = 1
+
+# --- LÄS IN ALLA SET-FILER OCH NORMALISERA DATA ---
 if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
     combined_sets = []
+    seen_keys = set()
+    
     for file_path in SET_FILES:
         data = github_load_file(file_path, [])
         if isinstance(data, list):
-            combined_sets.extend(data)
-    
+            for item in data:
+                # Normalisera fältnamn (stor/liten bokstav)
+                set_bet = str(item.get("SetBet") or item.get("ptcgoCode") or item.get("id") or "").strip()
+                set_name = str(item.get("SetName") or item.get("name") or "").strip()
+                lang = str(item.get("Language") or item.get("language") or item.get("Språk") or "ENG").strip().upper()
+                
+                # Säkra att TotalCards blir ett nummer
+                raw_total = item.get("TotalCards") or item.get("printedTotal") or item.get("total") or item.get("Maxantal kort") or 0
+                try:
+                    total_cards = int(str(raw_total).strip())
+                except ValueError:
+                    total_cards = 0
+
+                # Undvik dubbletter baserat på SetBet + Språk
+                unique_key = f"{set_bet}_{lang}"
+                if set_bet and unique_key not in seen_keys:
+                    seen_keys.add(unique_key)
+                    normalized_item = {
+                        "id": set_bet,
+                        "ptcgoCode": set_bet,
+                        "name": set_name,
+                        "language": lang,
+                        "total": total_cards,
+                        "images": item.get("images", {})
+                    }
+                    combined_sets.append(normalized_item)
+
     if not combined_sets:
         combined_sets = DEFAULT_SETS
-        
+
     st.session_state["sets_data"] = combined_sets
 
-app_data = st.session_state["app_data"]
+# Sätt sets_db till de laddade seten
 sets_db = st.session_state["sets_data"]
 
-if "collection" not in app_data:
-    app_data["collection"] = []
-if "custom_names" not in app_data:
-    app_data["custom_names"] = []
-
-app_data["collection"] = fix_existing_collection(app_data["collection"])
-eur_to_sek = fetch_eur_to_sek_rate()
-
-# --- LAYOUT & TABS ---
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Samling", "⚡ Snabb-registrering", "⚙️ Namn-inställningar", "🗂️ Set-databas"])
+# --- TABBAR ---
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Samling", "⚡ Snabb-registrering", "⚙️ Namn-inställningar", "📁 Set-databas"])
 
 # --- FLIK 1: SAMLING ---
 with tab1:
@@ -190,7 +140,7 @@ with tab1:
         with c_rate_txt:
             st.info(f"💱 **Aktuell kurs:** 1 EUR = **{eur_to_sek:.2f} SEK**")
         with c_rate_btn:
-            if st.button("🔄 Uppdatera", help="Hämta senast gällande växelkurs"):
+            if st.button("🔄 Uppdatera", help="Hämta senast gällande växelkurs och ladda om data"):
                 fetch_eur_to_sek_rate.clear()
                 st.session_state["app_data"] = None
                 st.session_state["sets_data"] = None
@@ -279,6 +229,9 @@ with tab1:
             if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
                 raw_edited = edited_df.to_dict(orient="records")
                 
+                def clean_num(val):
+                    return str(val).split('/')[0].strip().lstrip('0') if val else ""
+
                 processed_list = []
                 for row in raw_edited:
                     c_id = row.get("_id") or str(uuid.uuid4())
@@ -287,23 +240,41 @@ with tab1:
                     v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
                     s_name = row.get("Engelskt Namn") or row.get("Namn") or ""
                     
+                    set_nr_input = str(row.get("Setnr.") or "").strip()
+                    set_bet = str(row.get("SetBet.") or "").strip()
+                    set_name = str(row.get("Set") or "").strip()
+                    img_url = str(row.get("Bild") or "").strip()
+
+                    if set_nr_input and (not set_bet or not set_name):
+                        target_num = clean_num(set_nr_input)
+                        for s_item in sets_db:
+                            db_num = clean_num(s_item.get("total", ""))
+                            if db_num and str(db_num) == target_num:
+                                if not set_bet:
+                                    set_bet = s_item.get("ptcgoCode") or s_item.get("id", "").upper()
+                                if not set_name:
+                                    set_name = s_item.get("name", "")
+                                if not img_url and "images" in s_item:
+                                    img_url = s_item["images"].get("small", "")
+                                break
+
                     clean_card = {
                         "_id": c_id,
-                        "Bild": str(row.get("Bild") or "").strip(),
+                        "Bild": img_url,
                         "Pärmnummer": int(row.get("Pärmnummer", 0) or 0),
                         "Språk": row.get("Språk", "ENG"),
                         "Namn": row.get("Namn", ""),
                         "Engelskt Namn": s_name,
-                        "Setnr.": str(row.get("Setnr.") or "").strip(),
-                        "SetBet.": str(row.get("SetBet.") or "").strip(),
-                        "Set": str(row.get("Set") or "").strip(),
+                        "Setnr.": set_nr_input,
+                        "SetBet.": set_bet,
+                        "Set": set_name,
                         "Övrigt": row.get("Övrigt", "Normal"),
                         "Skick": row.get("Skick", "NM"),
                         "Köpt för (EUR)": k_eur,
                         "Köpt för (SEK)": round(k_eur * eur_to_sek, 2),
                         "Värde (EUR)": v_eur,
                         "Värde idag (SEK)": round(v_eur * eur_to_sek, 2),
-                        "Google Sök": generate_google_cardmarket_url(s_name, row.get("Setnr.", ""), row.get("Set", "")),
+                        "Google Sök": generate_google_cardmarket_url(s_name, set_nr_input, set_name),
                         "Egen Cardmarket Länk": str(row.get("Egen Cardmarket Länk") or "").strip()
                     }
                     processed_list.append(clean_card)
@@ -314,7 +285,7 @@ with tab1:
 
                 app_data["collection"] = processed_list
                 save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", [])}
-                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling och tog bort rad(er)")
+                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling")
                 
                 if success:
                     st.session_state["app_data"] = None 
@@ -337,7 +308,6 @@ with tab2:
     st.subheader("⚡ Snabb-registrering")
     st.caption("Välj språk, namn och setnummer för att hämta rätt set automatiskt.")
 
-    # 1. Hämta sparade namn till rullistan
     saved_names = app_data.get("custom_names", [])
 
     c1, c2, c3 = st.columns([1, 2, 2])
@@ -351,32 +321,29 @@ with tab2:
     with c3:
         reg_setnr_raw = st.text_input("Setnr.", placeholder="T.ex. 043/108 eller 043")
 
-    # Extrahera enbart siffran från input (t.ex. "043/108" -> 43)
     clean_num_str = reg_setnr_raw.split('/')[0].strip().lstrip('0')
     card_number = int(clean_num_str) if clean_num_str.isdigit() else None
 
-    # Filter-logik för set-databasen
     matching_sets = []
     if card_number is not None:
         for s_item in sets_db:
-            total_cards = s_item.get("printedTotal") or s_item.get("total") or 0
-            # Om setet har tillräckligt många kort för att innehålla detta nummer
-            if total_cards >= card_number:
+            s_lang = s_item.get("language", "ENG")
+            total_cards = s_item.get("total", 0)
+            
+            if s_lang == reg_language.upper() and total_cards >= card_number:
                 matching_sets.append(s_item)
 
     selected_set = None
     if matching_sets:
-        # Skapa alternativ till rullistan: "Set-namn (Kortkod / Totalt antal)"
         set_options = {
-            f"{s.get('name')} ({s.get('ptcgoCode', s.get('id', '')).upper()}) — Total: {s.get('printedTotal', s.get('total', '?'))}": s
+            f"{s.get('name')} ({s.get('id')}) — Total: {s.get('total')} kort": s
             for s in matching_sets
         }
         chosen_label = st.selectbox("Välj matchande Set:", options=list(set_options.keys()))
         selected_set = set_options[chosen_label]
     elif reg_setnr_raw:
-        st.warning("Hittade inga set som har så många kort. Kontrollera numret eller välj manuellt nedan.")
+        st.warning(f"Hittade inga {reg_language}-set som har minst {card_number} kort. Kontrollera numret eller språket.")
 
-    # Övriga fält för kortet
     c4, c5, c6, c7 = st.columns(4)
     with c4:
         reg_ovrigt = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"])
