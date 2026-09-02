@@ -150,28 +150,19 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
-# --- FÖRBÄTTRAD SÖKFUNKTION FÖR FLERA SPRÅK OCH ASIATISKA SET ---
+# --- FÖRBÄTTRAD, FLEXIBEL SÖKFUNKTION FOR ENGELSKA & JAPANSKA KORT ---
 @st.cache_data(ttl=3600, max_entries=100)
 def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
     if not query or len(query.strip()) < 2:
         return []
-    
-    query_clean = query.strip().lower()
-    if "/" in query_clean:
-        query_clean = query_clean.split("/")[0].strip()
-
-    words = [w for w in re.split(r'\s+', query_clean) if w]
-    if not words:
-        return []
-
-    numbers = [w.lstrip("0") for w in words if w.isdigit()]
-    text_words = [w for w in words if not w.isdigit()]
 
     headers = {'User-Agent': 'Mozilla/5.0'}
     results = []
     seen_ids = set()
 
-    # Mappa om vanliga japanska set-koder till TCGdex internt ID-format
+    clean_query = query.strip().lower()
+    
+    # 1. KÄNDA SET-ALIAS OCH SPECIALMAPPANINGAR
     SET_ALIAS_MAP = {
         "sm4a": ["sm4plus", "sm4+"],
         "sm4b": ["sm4b"],
@@ -181,26 +172,26 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
         "sv4a": ["sv4a"]
     }
 
-    # 1. DIREKT-SÖKNING PÅ SET + NUMMER (t.ex. "sm4a 016" -> testar "sm4plus-016")
+    words = clean_query.split()
+    numbers = [w.lstrip("0") for w in words if w.isdigit()]
+    text_words = [w for w in words if not w.isdigit()]
+
+    # METOD A: Om användaren anger "set nr" (t.ex. "sm4a 016" eller "swsh1 1")
     if text_words and numbers:
         raw_set = text_words[0]
         num_target = numbers[0]
-        
-        # Hämta lista på möjliga set-IDn
         target_sets = SET_ALIAS_MAP.get(raw_set, [raw_set])
-        
+
         for s_id in target_sets:
-            # Sök direkt på exakt kort-ID (format: set-nummer, t.ex. sm4plus-16 eller sm4plus-016)
-            for test_num in [num_target, num_target.zfill(3)]:
+            for test_num in [num_target, num_target.zfill(2), num_target.zfill(3)]:
                 try:
                     card_exact_id = f"{s_id}-{test_num}"
-                    url_card = f"https://api.tcgdex.net/v2/{lang_key}/cards/{urllib.parse.quote(card_exact_id)}"
-                    res_card = requests.get(url_card, headers=headers, timeout=2)
-                    
-                    if res_card.status_code == 200:
-                        item = res_card.json()
+                    url = f"https://api.tcgdex.net/v2/{lang_key}/cards/{urllib.parse.quote(card_exact_id)}"
+                    res = requests.get(url, headers=headers, timeout=2)
+                    if res.status_code == 200:
+                        item = res.json()
                         if isinstance(item, dict) and item.get("id"):
-                            c_id = str(item.get("id"))
+                            c_id = item.get("id")
                             img_base = item.get("image") or ""
                             full_set_name, set_code = get_set_details_sync(s_id, lang_key)
                             
@@ -217,14 +208,15 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
                 except Exception:
                     pass
 
-    # 2. GENERELL NAMNSÖKNING (Om inte exakt set+nr matchade)
-    search_term = text_words[0] if text_words else words[0]
+    # METOD B: BRED SÖKNING VIA TCGDEX SÖK-ENDPOINT (Fungerar för alla engelska/japanska namn)
     try:
-        url_search = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(search_term)}"
-        res_search = requests.get(url_search, headers=headers, timeout=3)
+        # Om det finns textord, sök i första hand på namnet/ordet
+        search_term = text_words[0] if text_words else clean_query
+        url = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(search_term)}"
+        res = requests.get(url, headers=headers, timeout=3)
         
-        if res_search.status_code == 200:
-            cards_list = res_search.json()
+        if res.status_code == 200:
+            cards_list = res.json()
             if isinstance(cards_list, list):
                 for item in cards_list:
                     c_id = str(item.get("id") or "").lower()
@@ -235,10 +227,9 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
                     id_number = id_parts[-1].lstrip("0") if len(id_parts) > 1 else ""
                     card_num = c_local_id if c_local_id else id_number
 
-                    text_match = all(tw in c_name or tw in c_id for tw in text_words)
-                    num_match = True
-                    if numbers:
-                        num_match = any(num == card_num for num in numbers)
+                    # Matchningsfiltrering
+                    text_match = all(tw in c_name or tw in c_id for tw in text_words) if text_words else True
+                    num_match = (any(num == card_num for num in numbers)) if numbers else True
 
                     if text_match and num_match:
                         card_id = str(item.get("id") or "")
@@ -260,7 +251,7 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
                                 "image_url": f"{img_base}/high.png" if img_base else "",
                                 "default_lang": lang_code
                             })
-                            if len(results) >= 20:
+                            if len(results) >= 25:
                                 break
     except Exception:
         pass
