@@ -181,11 +181,17 @@ def search_pokemon_cards(query):
                     c_name = str(item.get("name") or "").lower()
                     c_local = str(item.get("localId") or "").lower()
                     
+                    # Flexibel matchning (som tidigare):
+                    # Sökordet räcker att det delvis finns i ID, Namn eller Kortnummer
                     matches_all = True
                     for w in search_words:
+                        w_clean = w.lstrip("0")
+                        c_local_clean = c_local.lstrip("0")
+                        
                         in_id = w in c_id
                         in_name = w in c_name
-                        in_local = (w == c_local) or (w.lstrip("0") == c_local.lstrip("0"))
+                        in_local = (w in c_local) or (w_clean != "" and w_clean in c_local_clean)
+                        
                         if not (in_id or in_name or in_local):
                             matches_all = False
                             break
