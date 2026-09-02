@@ -38,7 +38,7 @@ def github_load_file(file_path: str, default_data: Any) -> Any:
                 return default_data
             return json.loads(content)
         except Exception as e:
-            st.error(f"⚠️ JSON-fel i filen **{file_path}**: Kontrollera att filen har korrekt syntax (t.ex. saknade kommatecken). Detalj: {e}")
+            st.error(f"⚠️ JSON-fel i filen **{file_path}**: Kontrollera att filen har korrekt syntax. Detalj: {e}")
             return default_data
     return default_data
 
@@ -84,7 +84,6 @@ def generate_google_cardmarket_url(name, setnr, setname):
 # --- LADDA SAMLING OCH NAMN SEPARAT ---
 if "app_data" not in st.session_state or st.session_state["app_data"] is None:
     loaded_data = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": []})
-    # Skydda mot att samlingen nollställs om filen tillfälligt inte nås
     if not isinstance(loaded_data, dict) or "collection" not in loaded_data:
         loaded_data = {"collection": [], "custom_names": []}
     st.session_state["app_data"] = loaded_data
@@ -132,6 +131,9 @@ if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
     st.session_state["sets_data"] = combined_sets
 
 sets_db = st.session_state["sets_data"]
+
+# --- TABBAR ---
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Samling", "⚡ Snabb-registrering", "⚙️ Namn-inställningar", "📁 Set-databas"])
 
 # --- FLIK 1: SAMLING ---
 with tab1:
@@ -306,7 +308,7 @@ with tab1:
     else:
         st.info("Samlingen är tom. Gå till fliken 'Snabb-registrering'.")
 
-# --- FLIK 2: DIREKT-REGISTRERING ---
+# --- FLIK 2: SNABB-REGISTRERING ---
 with tab2:
     st.subheader("⚡ Snabb-registrering")
     st.caption("Välj språk, namn och setnummer för att hämta rätt set automatiskt.")
@@ -403,109 +405,46 @@ with tab2:
                 st.rerun()
             else:
                 st.error(f"Kunde inte spara till GitHub: {msg}")
-                
+
 # --- FLIK 3: NAMN-INSTÄLLNINGAR ---
 with tab3:
-    st.subheader("⚙️ Pokémon-namn i Rullistan")
-    st.caption("Hantera listan över namn som ska synas i rullistan när du registrerar nya kort.")
+    st.subheader("⚙️ Hantera sparade Pokémon-namn")
+    st.caption("Lägg till eller ta bort namn för snabbval i listan.")
 
-    # Hämtar sparade namn eller tom lista (utan återställning)
-    names_list = app_data.get("custom_names", [])
+    current_names = app_data.get("custom_names", [])
     
-    col_add1, col_add2 = st.columns([3, 1])
-    with col_add1:
-        new_name_input = st.text_input("Lägg till nytt Pokémon-namn:", placeholder="T.ex. Lucario")
-    with col_add2:
-        st.write(" ")
-        st.write(" ")
-        if st.button("➕ Lägg till namn", use_container_width=True):
-            clean_n = new_name_input.strip()
-            if clean_n and clean_n not in names_list:
-                names_list.append(clean_n)
-                names_list.sort()
-                app_data["custom_names"] = names_list
-                save_payload = {"collection": app_data.get("collection", []), "custom_names": names_list}
-                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade namnlista")
-                if success:
-                    st.session_state["app_data"] = None  # Tvingar cachen att uppdateras från GitHub
-                    st.success(f"Lade till '{clean_n}'!")
-                    st.rerun()
-                else:
-                    st.error(msg)
+    new_custom_name = st.text_input("Lägg till nytt Pokémon-namn")
+    if st.button("Lägg till namn"):
+        if new_custom_name and new_custom_name not in current_names:
+            current_names.append(new_custom_name.strip())
+            current_names.sort()
+            app_data["custom_names"] = current_names
+            save_payload = {"collection": app_data.get("collection", []), "custom_names": current_names}
+            success, msg = github_save_file(DATA_FILE_PATH, save_payload, fukt="Lade till namn: {new_custom_name}")
+            if success:
+                st.session_state["app_data"] = None
+                st.success(f"Namnet '{new_custom_name}' lades till!")
+                st.rerun()
 
-    st.divider()
+    if current_names:
+        st.write("### Befintliga namn:")
+        name_to_remove = st.selectbox("Välj namn att ta bort", options=current_names)
+        if st.button("Ta bort valt namn", type="secondary"):
+            current_names.remove(name_to_remove)
+            app_data["custom_names"] = current_names
+            save_payload = {"collection": app_data.get("collection", []), "custom_names": current_names}
+            success, msg = github_save_file(DATA_FILE_PATH, save_payload, f"Tog bort namn: {name_to_remove}")
+            if success:
+                st.session_state["app_data"] = None
+                st.success(f"Tog bort '{name_to_remove}'.")
+                st.rerun()
 
-    names_df = pd.DataFrame({"Pokémon Name": names_list})
-    edited_names = st.data_editor(
-        names_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="names_editor"
-    )
-
-    if st.button("💾 Spara Namnlista", type="primary"):
-        updated_names = [n.strip() for n in edited_names["Pokémon Name"].dropna().tolist() if n.strip()]
-        updated_names = sorted(list(set(updated_names)))
-        app_data["custom_names"] = updated_names
-        save_payload = {"collection": app_data.get("collection", []), "custom_names": updated_names}
-        success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Redigerade namnlista")
-        if success:
-            st.session_state["app_data"] = None  # Rensar cachen så raderingarna sparas permanent
-            st.success("Namnlistan uppdaterades!")
-            st.rerun()
-        else:
-            st.error(msg)
-            
 # --- FLIK 4: SET-DATABAS ---
 with tab4:
-    st.subheader("🗂️ Global Set-databas")
-    st.caption("Filtrera, redigera och lägg till set. Ändringar du gör här sparas i `pokemon_sets_egna.json` på GitHub.")
-
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        filter_lang = st.selectbox("Filtrera på språk:", ["ALLA", "JPN", "ENG", "SWE", "GER", "FRA", "ITA", "KOR", "SPA", "POR", "ZHT"])
-    with col_f2:
-        filter_search = st.text_input("Sök i set-namn / kod:", placeholder="T.ex. sv3 eller Ruler")
-
-    sets_df = pd.DataFrame(sets_db)
-    
-    for c in ["SetBet", "SetName", "Language", "TotalCards", "ReleaseYear"]:
-        if c not in sets_df.columns:
-            sets_df[c] = ""
-
-    filtered_df = sets_df.copy()
-    if filter_lang != "ALLA":
-        filtered_df = filtered_df[filtered_df["Language"] == filter_lang]
-    if filter_search.strip():
-        q = filter_search.strip().lower()
-        filtered_df = filtered_df[
-            filtered_df["SetBet"].astype(str).str.lower().str.contains(q) | 
-            filtered_df["SetName"].astype(str).str.lower().str.contains(q)
-        ]
-
-    sets_config = {
-        "SetBet": st.column_config.TextColumn("SetBet (Setkod)", width=110),
-        "SetName": st.column_config.TextColumn("Set (Fullständigt Namn)", width=220),
-        "Language": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width=80),
-        "TotalCards": st.column_config.TextColumn("Maxantal kort", width=100),
-        "ReleaseYear": st.column_config.NumberColumn("Utgivningsår", format="%d", step=1, width=100)
-    }
-
-    edited_sets_df = st.data_editor(
-        filtered_df,
-        column_config=sets_config,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="sets_db_editor"
-    )
-
-    if st.button("💾 Spara ändringar i Set-databasen", type="primary"):
-        edited_list = edited_sets_df.to_dict(orient="records")
-        
-        success, msg = github_save_file(CUSTOM_SETS_FILE_PATH, edited_list, "Uppdaterade set-databasen")
-        if success:
-            st.session_state["sets_data"] = None
-            st.success(f"Ändringarna sparades till {CUSTOM_SETS_FILE_PATH}!")
-            st.rerun()
-        else:
-            st.error(msg)
+    st.subheader("📁 Tillgängliga Set i Databasen")
+    st.caption("Här ser du alla inlästa set för både engelska och japanska.")
+    if sets_db:
+        sets_df = pd.DataFrame(sets_db)
+        st.dataframe(sets_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("Inga set hittades.")
