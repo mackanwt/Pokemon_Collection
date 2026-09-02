@@ -1,5 +1,25 @@
 {
-    "collection": [],
+    "collection": [
+        {
+            "_id": "4592d53c-71db-499d-b235-6c8830f8d6ce",
+            "Bild": "",
+            "P\u00e4rmnummer": 1,
+            "Spr\u00e5k": "JPN",
+            "Namn": "Togepi",
+            "Engelskt Namn": "Togepi",
+            "Setnr.": "043/108",
+            "SetBet.": "SV3",
+            "Set": "Ruler of the Black Flame",
+            "\u00d6vrigt": "Normal",
+            "Skick": "NM",
+            "K\u00f6pt f\u00f6r (EUR)": 0.0,
+            "K\u00f6pt f\u00f6r (SEK)": 0.0,
+            "V\u00e4rde (EUR)": 0.0,
+            "V\u00e4rde idag (SEK)": 0.0,
+            "Google S\u00f6k": "https://www.google.com/search?q=Togepi+043/108+Ruler+of+the+Black+Flame+site:cardmarket.com",
+            "Egen Cardmarket L\u00e4nk": ""
+        }
+    ],
     "custom_names": [
         "Alolan Raichu",
         "Togepi"
