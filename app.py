@@ -46,8 +46,8 @@ JAPANESE_SET_MAP = {
 }
 
 LANGUAGE_OPTIONS = {
-    "Japanska (JPN)": ("ja", "JPN"),
     "Engelska (ENG)": ("en", "ENG"),
+    "Japanska (JPN)": ("ja", "JPN"),
     "Franska (FRA)": ("fr", "FRA"),
     "Tyska (GER)": ("de", "GER"),
     "Spanska (ESP)": ("es", "SPA"),
@@ -150,8 +150,7 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
-# --- KORRIGERAD SÖKFUNKTION MED DIREKT-ID FÖR JAPANSKA OCH ENGELSKA KORT ---
-@st.cache_data(ttl=3600, max_entries=100)
+# --- NY DIREKT-SÖKFUNKTION UTAN CACHE ---
 def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
     if not query or len(query.strip()) < 1:
         return []
@@ -164,22 +163,19 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
     words = clean_query.split()
     
     numbers = [w.lstrip("0") for w in words if w.isdigit()]
-    text_words = [w.lower() for w in words if not w.isdigit()]
+    text_words = [w for w in words if not w.isdigit()]
 
-    # 1. DIREKTSÖKNING PÅ KORT-ID (t.ex. "sm4a 016", "sm4a-16", "sv4a 001")
-    # Detta täcker både japanska och engelska direktanrop mot TCGdex
+    # METOD 1: SÖKNING MED SET-KOD OCH NUMMER (T.ex. "sm4a 016", "sm4a-16")
     if text_words and numbers:
-        set_id = text_words[0]
+        set_id = text_words[0].lower()
         num = numbers[0]
         
-        # Generera varianter av ID (t.ex. sm4a-16 och sm4a-016)
         id_candidates = [
             f"{set_id}-{num}",
             f"{set_id}-{num.zfill(3)}",
             f"{set_id}-{num.zfill(2)}"
         ]
 
-        # Testa valt språk samt automatiskt 'ja' och 'en' om det saknas
         langs_to_test = [lang_key]
         if "ja" not in langs_to_test:
             langs_to_test.append("ja")
@@ -189,9 +185,7 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
         for l_key in langs_to_test:
             for cand_id in id_candidates:
                 try:
-                    # Enkoda URL korrekt för japanska tecken/specialtecken
-                    safe_cand_id = urllib.parse.quote(cand_id.lower())
-                    url = f"https://api.tcgdex.net/v2/{l_key}/cards/{safe_cand_id}"
+                    url = f"https://api.tcgdex.net/v2/{l_key}/cards/{urllib.parse.quote(cand_id)}"
                     res = requests.get(url, headers=headers, timeout=2)
                     
                     if res.status_code == 200:
@@ -204,7 +198,6 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
                                 raw_set_id = c_id.split("-")[0] if "-" in c_id else set_id
                                 full_set_name, set_code = get_set_details_sync(raw_set_id, l_key)
 
-                                # Bestäm språkkod baserat på vad API:et faktiskt svarade med
                                 detected_lang_code = "JPN" if l_key == "ja" else lang_code
 
                                 results.append({
@@ -221,42 +214,52 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
                 except Exception:
                     pass
 
-    # 2. STANDARD NAMNSÖKNING (För fritext som "Pikachu" eller japanska namn i hiragana)
-    try:
-        encoded_query = urllib.parse.quote(clean_query.lower())
-        url_search = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={encoded_query}"
-        res_search = requests.get(url_search, headers=headers, timeout=3)
-        
-        if res_search.status_code == 200:
-            cards_list = res_search.json()
-            if isinstance(cards_list, list):
-                for item in cards_list:
-                    c_id = str(item.get("id") or "").lower()
-                    c_name = str(item.get("name") or "").lower()
-                    
-                    if c_id not in seen_ids:
-                        seen_ids.add(c_id)
-                        img_base = item.get("image") or ""
-                        raw_set_id = c_id.split("-")[0] if "-" in c_id else ""
-                        full_set_name, set_code = get_set_details_sync(raw_set_id, lang_key)
+    # METOD 2: NAMNSÖKNING (T.ex. "raichu 31" eller "raichu")
+    search_term = " ".join(text_words) if text_words else clean_query
+    if search_term:
+        try:
+            url_search = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(search_term)}"
+            res_search = requests.get(url_search, headers=headers, timeout=3)
+            
+            if res_search.status_code == 200:
+                cards_list = res_search.json()
+                if isinstance(cards_list, list):
+                    for item in cards_list:
+                        c_id = str(item.get("id") or "").lower()
+                        c_name = str(item.get("name") or "").lower()
+                        c_local_id = str(item.get("localId") or "").lstrip("0")
+                        
+                        id_parts = c_id.split("-")
+                        id_number = id_parts[-1].lstrip("0") if len(id_parts) > 1 else ""
+                        card_num = c_local_id if c_local_id else id_number
 
-                        results.append({
-                            "id": f"{c_id}_{lang_code}",
-                            "name": item.get("name") or "",
-                            "eng_name": item.get("name") or "",
-                            "set_code": set_code or "",
-                            "set_name": full_set_name or "",
-                            "number": str(item.get("localId") or ""),
-                            "image_url": f"{img_base}/high.png" if img_base else "",
-                            "default_lang": lang_code
-                        })
-                        if len(results) >= 20:
-                            break
-    except Exception:
-        pass
+                        num_match = True
+                        if numbers:
+                            num_match = any(num == card_num for num in numbers)
+
+                        if num_match and c_id not in seen_ids:
+                            seen_ids.add(c_id)
+                            img_base = item.get("image") or ""
+                            raw_set_id = c_id.split("-")[0] if "-" in c_id else ""
+                            full_set_name, set_code = get_set_details_sync(raw_set_id, lang_key)
+
+                            results.append({
+                                "id": f"{c_id}_{lang_code}",
+                                "name": item.get("name") or "",
+                                "eng_name": item.get("name") or "",
+                                "set_code": set_code or "",
+                                "set_name": full_set_name or "",
+                                "number": str(item.get("localId") or id_number),
+                                "image_url": f"{img_base}/high.png" if img_base else "",
+                                "default_lang": lang_code
+                            })
+                            if len(results) >= 20:
+                                break
+        except Exception:
+            pass
 
     return results
-    
+
 # --- INITIERA SESSION STATE ---
 if "editor_version" not in st.session_state:
     st.session_state["editor_version"] = 0
@@ -460,16 +463,22 @@ with tab1:
 with tab2:
     st.subheader("🔍 Sök på Namn, Nummer eller Setkod")
     
-    col_lang, col_search = st.columns([1, 3])
+    col_lang, col_search, col_btn = st.columns([1, 2, 1])
     with col_lang:
         selected_lang_label = st.selectbox("Välj Sök-språk:", list(LANGUAGE_OPTIONS.keys()), index=0)
         lang_key, lang_code = LANGUAGE_OPTIONS[selected_lang_label]
 
     with col_search:
-        search_query = st.text_input("Sök t.ex. 'sm4a 016' eller 'Alolan Raichu':", key="card_search_input")
-    
-    if search_query:
-        with st.spinner("Söker kort..."):
+        search_query = st.text_input("Sök t.ex. 'sm4a 016' eller 'raichu 31':", key="card_search_input")
+
+    with col_btn:
+        st.write(" ")
+        st.write(" ")
+        do_search = st.button("🔍 Sök Kort", type="primary", use_container_width=True)
+
+    if search_query and (do_search or search_query != st.session_state.get("last_query", "")):
+        st.session_state["last_query"] = search_query
+        with st.spinner("Söker kort i databasen..."):
             results = search_pokemon_cards(search_query, lang_key=lang_key, lang_code=lang_code)
             
         if results:
@@ -568,4 +577,4 @@ with tab2:
                                     st.error(f"Kunde inte spara till GitHub: {msg}")
                     st.divider()
         else:
-            st.warning("Inga kort hittades för din sökning. Se till att du valt rätt språk i dropdown-menyn.")
+            st.warning("Inga kort hittades för din sökning. Prova att klicka på knappen '🔍 Sök Kort'.")
