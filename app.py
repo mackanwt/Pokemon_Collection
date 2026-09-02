@@ -140,6 +140,7 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
+# --- ÅTERSTÄLLD OCH ÅTGÄRDAD SÖKFUNKTION ---
 @st.cache_data(ttl=3600)
 def search_pokemon_cards(query):
     if not query:
@@ -181,8 +182,6 @@ def search_pokemon_cards(query):
                     c_name = str(item.get("name") or "").lower()
                     c_local = str(item.get("localId") or "").lower()
                     
-                    # Flexibel matchning (som tidigare):
-                    # Sökordet räcker att det delvis finns i ID, Namn eller Kortnummer
                     matches_all = True
                     for w in search_words:
                         w_clean = w.lstrip("0")
