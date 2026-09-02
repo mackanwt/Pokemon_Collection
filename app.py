@@ -30,30 +30,10 @@ def fetch_eur_to_sek_rate():
         pass
     return 11.50
 
-# --- DEFAULT SET-DATABAS ---
+# --- RESERV / DEFAULT-LISTA (Körs endast om sets.json saknas helt på GitHub) ---
 DEFAULT_SETS = [
-    # JAPANSKA SET
-    {"SetBet": "SM1S", "SetName": "Collection Sun", "Language": "JPN", "TotalCards": "060", "ReleaseYear": 2016},
-    {"SetBet": "SM1M", "SetName": "Collection Moon", "Language": "JPN", "TotalCards": "060", "ReleaseYear": 2016},
-    {"SetBet": "SM2K", "SetName": "Islands Await You", "Language": "JPN", "TotalCards": "050", "ReleaseYear": 2017},
-    {"SetBet": "SM2L", "SetName": "Alolan Moonlight", "Language": "JPN", "TotalCards": "050", "ReleaseYear": 2017},
-    {"SetBet": "SM4A", "SetName": "Ultradimensional Beasts", "Language": "JPN", "TotalCards": "050", "ReleaseYear": 2017},
-    {"SetBet": "S12A", "SetName": "VSTAR Universe", "Language": "JPN", "TotalCards": "172", "ReleaseYear": 2022},
-    {"SetBet": "SV1S", "SetName": "Scarlet ex", "Language": "JPN", "TotalCards": "078", "ReleaseYear": 2023},
-    {"SetBet": "SV1V", "SetName": "Violet ex", "Language": "JPN", "TotalCards": "078", "ReleaseYear": 2023},
     {"SetBet": "SV3", "SetName": "Ruler of the Black Flame", "Language": "JPN", "TotalCards": "108", "ReleaseYear": 2023},
-    {"SetBet": "SV4A", "SetName": "Shiny Treasure ex", "Language": "JPN", "TotalCards": "190", "ReleaseYear": 2023},
-
-    # ENGELSKA SET
-    {"SetBet": "BS", "SetName": "Base Set", "Language": "ENG", "TotalCards": "102", "ReleaseYear": 1999},
-    {"SetBet": "JU", "SetName": "Jungle", "Language": "ENG", "TotalCards": "064", "ReleaseYear": 1999},
-    {"SetBet": "FO", "SetName": "Fossil", "Language": "ENG", "TotalCards": "062", "ReleaseYear": 1999},
-    {"SetBet": "CIN", "SetName": "Crimson Invasion", "Language": "ENG", "TotalCards": "111", "ReleaseYear": 2017},
-    {"SetBet": "GRI", "SetName": "Guardians Rising", "Language": "ENG", "TotalCards": "145", "ReleaseYear": 2017},
-    {"SetBet": "SVI", "SetName": "Scarlet & Violet Base", "Language": "ENG", "TotalCards": "198", "ReleaseYear": 2023},
-    {"SetBet": "PAL", "SetName": "Paldea Evolved", "Language": "ENG", "TotalCards": "279", "ReleaseYear": 2023},
-    {"SetBet": "OBF", "SetName": "Obsidian Flames", "Language": "ENG", "TotalCards": "230", "ReleaseYear": 2023},
-    {"SetBet": "MEW", "SetName": "151", "Language": "ENG", "TotalCards": "207", "ReleaseYear": 2023}
+    {"SetBet": "OBF", "SetName": "Obsidian Flames", "Language": "ENG", "TotalCards": "230", "ReleaseYear": 2023}
 ]
 
 DEFAULT_POKEMON_NAMES = [
@@ -134,7 +114,6 @@ def search_sets_db(input_text, selected_lang, sets_db):
     if not clean_text:
         return "", ""
 
-    # Filter baserat på vald språkmiljö först
     lang_sets = [s for s in sets_db if s.get("Language") == selected_lang]
 
     # 1. Matchning på exakt SetBet (t.ex. "sv3") inom valt språk
@@ -153,7 +132,7 @@ def search_sets_db(input_text, selected_lang, sets_db):
         if tot == target_total or (numeric_total and tot.lstrip("0") == numeric_total):
             return s.get("SetBet", ""), s.get("SetName", "")
 
-    # Fallback: Om inte hittat i valt språk, sök globalt på SetBet
+    # Fallback: Sök globalt om ej hittat i språk
     for s in sets_db:
         if clean_text == str(s.get("SetBet", "")).lower():
             return s.get("SetBet", ""), s.get("SetName", "")
@@ -234,40 +213,40 @@ with tab1:
             display_df = df.copy()
 
             column_config = {
-                "Bild": st.column_config.ImageColumn("Bild", width="small"),
-                "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small"),
-                "Språk": st.column_config.TextColumn("Språk", width="small"),
-                "Namn": st.column_config.TextColumn("Namn", width="medium"),
-                "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
-                "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
-                "Set": st.column_config.TextColumn("Set", width="medium"),
-                "Övrigt": st.column_config.TextColumn("Övrigt", width="small"),
-                "Skick": st.column_config.TextColumn("Skick", width="small"),
-                "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="€%.2f", width="small"),
-                "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="€%.2f", width="small"),
-                "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width="small"),
-                "Google Sök": st.column_config.LinkColumn("Sök Cardmarket", display_text="🔍 Google Sök", width="medium"),
-                "Egen Cardmarket Länk": st.column_config.LinkColumn("Min Cardmarket Länk", display_text="🔗 Öppna Sida", width="medium")
+                "Bild": st.column_config.ImageColumn("Bild", width=60),
+                "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width=60),
+                "Språk": st.column_config.TextColumn("Språk", width=60),
+                "Namn": st.column_config.TextColumn("Namn", width=150),
+                "Setnr.": st.column_config.TextColumn("Setnr.", width=70),
+                "SetBet.": st.column_config.TextColumn("SetBet.", width=70),
+                "Set": st.column_config.TextColumn("Set", width=160),
+                "Övrigt": st.column_config.TextColumn("Övrigt", width=80),
+                "Skick": st.column_config.TextColumn("Skick", width=60),
+                "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="€%.2f", width=80),
+                "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="€%.2f", width=80),
+                "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width=90),
+                "Google Sök": st.column_config.LinkColumn("Sök Cardmarket", display_text="🔍 Sök", width=100),
+                "Egen Cardmarket Länk": st.column_config.LinkColumn("Min Cardmarket Länk", display_text="🔗 Öppna Sida", width=130)
             }
             st.dataframe(display_df[columns_order], column_config=column_config, use_container_width=True, hide_index=True)
         
         else:
             column_config_edit = {
                 "_id": None,
-                "Bild": st.column_config.TextColumn("Bild-URL", width="medium"),
-                "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small", step=1),
-                "Språk": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width="small"),
-                "Namn": st.column_config.TextColumn("Namn", width="medium"),
-                "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
-                "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
-                "Set": st.column_config.TextColumn("Set/Base", width="medium"),
-                "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], width="small"),
-                "Skick": st.column_config.SelectboxColumn("Skick", options=["NM", "EX", "GD", "LP", "PL", "PO"], width="small"),
-                "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
-                "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width="small"),
-                "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width="small", disabled=True),
-                "Google Sök": st.column_config.TextColumn("Google Sök URL", disabled=True, width="medium"),
-                "Egen Cardmarket Länk": st.column_config.TextColumn("Klistra in Cardmarket URL här", width="large")
+                "Bild": st.column_config.TextColumn("Bild-URL", width=100),
+                "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width=60, step=1),
+                "Språk": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width=70),
+                "Namn": st.column_config.TextColumn("Namn", width=150),
+                "Setnr.": st.column_config.TextColumn("Setnr.", width=70),
+                "SetBet.": st.column_config.TextColumn("SetBet.", width=70),
+                "Set": st.column_config.TextColumn("Set/Base", width=160),
+                "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], width=90),
+                "Skick": st.column_config.SelectboxColumn("Skick", options=["NM", "EX", "GD", "LP", "PL", "PO"], width=60),
+                "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width=80),
+                "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width=80),
+                "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width=90, disabled=True),
+                "Google Sök": st.column_config.TextColumn("Google Sök URL", disabled=True, width=100),
+                "Egen Cardmarket Länk": st.column_config.TextColumn("Klistra in Cardmarket URL här", width=200)
             }
 
             edit_columns = ["_id"] + columns_order
@@ -388,16 +367,16 @@ with tab2:
     reg_df.at[0, "Set"] = auto_set
 
     reg_config = {
-        "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width="small", step=1),
-        "Språk": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width="small"),
-        "Namn": st.column_config.SelectboxColumn("Namn", options=app_data.get("custom_names", DEFAULT_POKEMON_NAMES), width="medium"),
-        "Setnr.": st.column_config.TextColumn("Setnr.", width="small"),
-        "SetBet.": st.column_config.TextColumn("SetBet.", width="small"),
-        "Set": st.column_config.TextColumn("Set", width="medium"),
-        "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], width="small"),
-        "Skick": st.column_config.SelectboxColumn("Skick", options=["NM", "EX", "GD", "LP", "PL", "PO"], width="small"),
-        "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width="small"),
-        "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width="small"),
+        "Pärmnummer": st.column_config.NumberColumn("Pärmnr.", width=60, step=1),
+        "Språk": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width=70),
+        "Namn": st.column_config.SelectboxColumn("Namn", options=app_data.get("custom_names", DEFAULT_POKEMON_NAMES), width=150),
+        "Setnr.": st.column_config.TextColumn("Setnr.", width=70),
+        "SetBet.": st.column_config.TextColumn("SetBet.", width=70),
+        "Set": st.column_config.TextColumn("Set", width=160),
+        "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], width=90),
+        "Skick": st.column_config.SelectboxColumn("Skick", options=["NM", "EX", "GD", "LP", "PL", "PO"], width=60),
+        "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width=80),
+        "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width=80),
     }
 
     edited_reg = st.data_editor(
@@ -535,7 +514,7 @@ with tab3:
 # --- FLIK 4: SET-DATABAS ---
 with tab4:
     st.subheader("🗂️ Global Set-databas (`sets.json`)")
-    st.caption("Filtrera, redigera och lägg till set. Ändringar du gör här sparas i `sets.json` på GitHub och skrivs inte över vid framtida automatiska skriptuppdateringar.")
+    st.caption("Filtrera, redigera och lägg till set. Ändringar du gör här sparas i `sets.json` på GitHub.")
 
     col_f1, col_f2 = st.columns(2)
     with col_f1:
@@ -560,11 +539,11 @@ with tab4:
         ]
 
     sets_config = {
-        "SetBet": st.column_config.TextColumn("SetBet (Setkod)", width="small"),
-        "SetName": st.column_config.TextColumn("Set (Fullständigt Namn)", width="large"),
-        "Language": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width="small"),
-        "TotalCards": st.column_config.TextColumn("Maxantal kort", width="small"),
-        "ReleaseYear": st.column_config.NumberColumn("Utgivningsår", format="%d", step=1, width="small")
+        "SetBet": st.column_config.TextColumn("SetBet (Setkod)", width=110),
+        "SetName": st.column_config.TextColumn("Set (Fullständigt Namn)", width=220),
+        "Language": st.column_config.SelectboxColumn("Språk", options=["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], width=80),
+        "TotalCards": st.column_config.TextColumn("Maxantal kort", width=100),
+        "ReleaseYear": st.column_config.NumberColumn("Utgivningsår", format="%d", step=1, width=100)
     }
 
     edited_sets_df = st.data_editor(
@@ -576,10 +555,8 @@ with tab4:
     )
 
     if st.button("💾 Spara ändringar i Set-databasen", type="primary"):
-        # Slå ihop de ändrade raderna med resten av databasen
         edited_list = edited_sets_df.to_dict(orient="records")
         
-        # Ersätt/uppdatera rader i fulla databasen
         merged_db = []
         edited_keys = {(r.get("SetBet"), r.get("Language")) for r in edited_list}
         
