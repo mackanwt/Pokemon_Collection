@@ -271,10 +271,17 @@ with tab1:
                     v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
                     s_name = row.get("Engelskt Namn") or row.get("Namn") or ""
                     
-                    set_nr_input = str(row.get("Setnr.") or "").strip()
+              set_nr_input = str(row.get("Setnr.") or "").strip()
                     set_bet = str(row.get("SetBet.") or "").strip()
                     set_name = str(row.get("Set") or "").strip()
-                    img_url = str(row.get("Bild") or "").strip()
+                    
+                    # Hantera bildlänken automatiskt mot din GitHub-mapp "images"
+                    raw_img = str(row.get("Bild") or "").strip()
+                    if raw_img and not raw_img.startswith("http"):
+                        # Om du bara skriver filnamnet (t.ex. togepi043_108.jpg) byggs länken automatiskt
+                        img_url = f"https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/{raw_img}"
+                    else:
+                        img_url = raw_img
 
                     if set_nr_input and (not set_bet or not set_name):
                         target_num = clean_num(set_nr_input)
@@ -285,8 +292,6 @@ with tab1:
                                     set_bet = s_item.get("SetBet", "")
                                 if not set_name:
                                     set_name = s_item.get("SetName", "")
-                                if not img_url:
-                                    img_url = s_item.get("images", "")
                                 break
 
                     clean_card = {
