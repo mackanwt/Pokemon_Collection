@@ -343,17 +343,24 @@ with tab2:
 
     c1, c2, c3 = st.columns([1, 2, 2])
     with c1:
-        reg_language = st.selectbox("Språk", ["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], index=0)
+        reg_language = st.selectbox("Språk", ["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"], index=0, key="reg_lang")
     with c2:
         if saved_names:
-            reg_name = st.selectbox("Pokémon-namn", options=saved_names)
+            reg_name = st.selectbox("Pokémon-namn", options=saved_names, key="reg_name_sel")
         else:
-            reg_name = st.text_input("Pokémon-namn", placeholder="T.ex. Togepi")
+            reg_name = st.text_input("Pokémon-namn", placeholder="T.ex. Togepi", key="reg_name_txt")
     with c3:
-        reg_setnr_raw = st.text_input("Setnr.", placeholder="T.ex. 043/108 eller 043")
+        reg_setnr_raw = st.text_input("Setnr.", placeholder="T.ex. 043/108 eller 043", key="reg_setnr")
 
-    clean_num_str = reg_setnr_raw.split('/')[0].strip().lstrip('0')
+    parts = reg_setnr_raw.split('/')
+    clean_num_str = parts[0].strip().lstrip('0')
     card_number = int(clean_num_str) if clean_num_str.isdigit() else None
+
+    set_total_target = None
+    if len(parts) > 1:
+        set_total_str = parts[1].strip().lstrip('0')
+        if set_total_str.isdigit():
+            set_total_target = int(set_total_str)
 
     matching_sets = []
     if card_number is not None:
@@ -361,8 +368,13 @@ with tab2:
             s_lang = s_item.get("Språk", "ENG")
             total_cards = s_item.get("Total", 0)
             
-            if s_lang == reg_language.upper() and total_cards >= card_number:
-                matching_sets.append(s_item)
+            if s_lang == reg_language.upper():
+                if set_total_target is not None:
+                    if total_cards == set_total_target:
+                        matching_sets.append(s_item)
+                else:
+                    if total_cards >= card_number:
+                        matching_sets.append(s_item)
 
     selected_set = None
     if matching_sets:
@@ -370,22 +382,25 @@ with tab2:
             f"{s.get('SetName')} ({s.get('SetBet')}) — Total: {s.get('Total')} kort": s
             for s in matching_sets
         }
-        chosen_label = st.selectbox("Välj matchande Set:", options=list(set_options.keys()))
+        chosen_label = st.selectbox("Välj matchande Set:", options=list(set_options.keys()), key="reg_matched_set")
         selected_set = set_options[chosen_label]
     elif reg_setnr_raw:
-        st.warning(f"Hittade inga {reg_language}-set som har minst {card_number} kort. Kontrollera numret eller språket.")
+        if set_total_target is not None:
+            st.warning(f"Hittade inga {reg_language}-set med exakt {set_total_target} totala kort.")
+        else:
+            st.warning(f"Hittade inga {reg_language}-set som har minst {card_number} kort.")
 
     c4, c5, c6, c7 = st.columns(4)
     with c4:
-        reg_ovrigt = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"])
+        reg_ovrigt = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], key="reg_ovrigt")
     with c5:
-        reg_skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"])
+        reg_skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"], key="reg_skick")
     with c6:
-        reg_kopt = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5, format="%.2f")
+        reg_kopt = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="reg_kopt")
     with c7:
-        reg_varde = st.number_input("Värde (EUR)", min_value=0.0, value=0.0, step=0.5, format="%.2f")
+        reg_varde = st.number_input("Värde (EUR)", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="reg_varde")
 
-    if st.button("➕ Registrera kort i samlingen", type="primary", use_container_width=True):
+    if st.button("➕ Registrera kort i samlingen", type="primary", use_container_width=True, key="reg_btn"):
         if not reg_name:
             st.warning("Du måste fylla i eller välja ett Pokémon-namn.")
         else:
@@ -438,8 +453,8 @@ with tab3:
 
     current_names = app_data.get("custom_names", [])
     
-    new_custom_name = st.text_input("Lägg till nytt Pokémon-namn")
-    if st.button("Lägg till namn"):
+    new_custom_name = st.text_input("Lägg till nytt Pokémon-namn", key="new_name_input")
+    if st.button("Lägg till namn", key="add_name_btn"):
         if new_custom_name and new_custom_name not in current_names:
             current_names.append(new_custom_name.strip())
             current_names.sort()
