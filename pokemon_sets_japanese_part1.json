@@ -1,0 +1,499 @@
+[
+  {
+    "SetBet": "BS-JP",
+    "SetName": "Expansion Pack (Base Set)",
+    "Language": "JPN",
+    "TotalCards": "102",
+    "ReleaseYear": 1996
+  },
+  {
+    "SetBet": "J1-JP",
+    "SetName": "Jungle",
+    "Language": "JPN",
+    "TotalCards": "048",
+    "ReleaseYear": 1997
+  },
+  {
+    "SetBet": "F1-JP",
+    "SetName": "Mystery of the Fossils (Fossil)",
+    "Language": "JPN",
+    "TotalCards": "048",
+    "ReleaseYear": 1997
+  },
+  {
+    "SetBet": "TR-JP",
+    "SetName": "Rocket Gang (Team Rocket)",
+    "Language": "JPN",
+    "TotalCards": "065",
+    "ReleaseYear": 1997
+  },
+  {
+    "SetBet": "G1-JP",
+    "SetName": "Leaders' Stadium (Gym Heroes)",
+    "Language": "JPN",
+    "TotalCards": "096",
+    "ReleaseYear": 1998
+  },
+  {
+    "SetBet": "G2-JP",
+    "SetName": "Challenge from the Darkness (Gym Challenge)",
+    "Language": "JPN",
+    "TotalCards": "096",
+    "ReleaseYear": 1999
+  },
+  {
+    "SetBet": "N1-JP",
+    "SetName": "Gold, Silver, to a New World... (Neo Genesis)",
+    "Language": "JPN",
+    "TotalCards": "096",
+    "ReleaseYear": 2000
+  },
+  {
+    "SetBet": "N2-JP",
+    "SetName": "Crossing the Ruins... (Neo Discovery)",
+    "Language": "JPN",
+    "TotalCards": "056",
+    "ReleaseYear": 2000
+  },
+  {
+    "SetBet": "N3-JP",
+    "SetName": "Awakening Legends (Neo Revelation)",
+    "Language": "JPN",
+    "TotalCards": "064",
+    "ReleaseYear": 2000
+  },
+  {
+    "SetBet": "N4-JP",
+    "SetName": "Darkness, and to Light... (Neo Destiny)",
+    "Language": "JPN",
+    "TotalCards": "113",
+    "ReleaseYear": 2001
+  },
+  {
+    "SetBet": "E1-JP",
+    "SetName": "Base Expansion Pack",
+    "Language": "JPN",
+    "TotalCards": "128",
+    "ReleaseYear": 2001
+  },
+  {
+    "SetBet": "E2-JP",
+    "SetName": "Town on No Maps",
+    "Language": "JPN",
+    "TotalCards": "092",
+    "ReleaseYear": 2002
+  },
+  {
+    "SetBet": "E3-JP",
+    "SetName": "Wind from the Sea",
+    "Language": "JPN",
+    "TotalCards": "087",
+    "ReleaseYear": 2002
+  },
+  {
+    "SetBet": "E4-JP",
+    "SetName": "Split Earth",
+    "Language": "JPN",
+    "TotalCards": "088",
+    "ReleaseYear": 2002
+  },
+  {
+    "SetBet": "E5-JP",
+    "SetName": "Mysterious Mountains",
+    "Language": "JPN",
+    "TotalCards": "088",
+    "ReleaseYear": 2002
+  },
+  {
+    "SetBet": "ADV1-JP",
+    "SetName": "ADV Expansion Pack (EX Ruby & Sapphire)",
+    "Language": "JPN",
+    "TotalCards": "055",
+    "ReleaseYear": 2003
+  },
+  {
+    "SetBet": "ADV2-JP",
+    "SetName": "Miracle of the Desert (EX Sandstorm)",
+    "Language": "JPN",
+    "TotalCards": "053",
+    "ReleaseYear": 2003
+  },
+  {
+    "SetBet": "ADV3-JP",
+    "SetName": "Rulers of the Heavens (EX Dragon)",
+    "Language": "JPN",
+    "TotalCards": "054",
+    "ReleaseYear": 2003
+  },
+  {
+    "SetBet": "ADV4-JP",
+    "SetName": "Undone Seal (EX Team Magma vs Team Aqua)",
+    "Language": "JPN",
+    "TotalCards": "084",
+    "ReleaseYear": 2004
+  },
+  {
+    "SetBet": "PCG1-JP",
+    "SetName": "Flight of Legends (EX Hidden Legends)",
+    "Language": "JPN",
+    "TotalCards": "083",
+    "ReleaseYear": 2004
+  },
+  {
+    "SetBet": "PCG2-JP",
+    "SetName": "CLASH OF BLUE SKY (EX Deoxys)",
+    "Language": "JPN",
+    "TotalCards": "082",
+    "ReleaseYear": 2004
+  },
+  {
+    "SetBet": "PCG3-JP",
+    "SetName": "Rocket Gang Strikes Back (EX Team Rocket Returns)",
+    "Language": "JPN",
+    "TotalCards": "084",
+    "ReleaseYear": 2004
+  },
+  {
+    "SetBet": "PCG4-JP",
+    "SetName": "Golden Sky, Silvery Ocean (EX Unseen Forces)",
+    "Language": "JPN",
+    "TotalCards": "106",
+    "ReleaseYear": 2005
+  },
+  {
+    "SetBet": "PCG5-JP",
+    "SetName": "Mirage Forest (EX Legend Maker)",
+    "Language": "JPN",
+    "TotalCards": "086",
+    "ReleaseYear": 2005
+  },
+  {
+    "SetBet": "PCG6-JP",
+    "SetName": "Holon Research Tower (EX Delta Species)",
+    "Language": "JPN",
+    "TotalCards": "086",
+    "ReleaseYear": 2005
+  },
+  {
+    "SetBet": "PCG7-JP",
+    "SetName": "Holon Phantom (EX Holon Phantoms)",
+    "Language": "JPN",
+    "TotalCards": "052",
+    "ReleaseYear": 2006
+  },
+  {
+    "SetBet": "PCG8-JP",
+    "SetName": "Miracle Crystal (EX Crystal Guardians)",
+    "Language": "JPN",
+    "TotalCards": "075",
+    "ReleaseYear": 2006
+  },
+  {
+    "SetBet": "PCG9-JP",
+    "SetName": "Offense & Defense of the Further Away (EX Dragon Frontiers)",
+    "Language": "JPN",
+    "TotalCards": "076",
+    "ReleaseYear": 2006
+  },
+  {
+    "SetBet": "PCG10-JP",
+    "SetName": "World Down Under (EX Power Keepers)",
+    "Language": "JPN",
+    "TotalCards": "068",
+    "ReleaseYear": 2006
+  },
+  {
+    "SetBet": "DP1-JP",
+    "SetName": "Space-Time Creation (Diamond & Pearl)",
+    "Language": "JPN",
+    "TotalCards": "110",
+    "ReleaseYear": 2006
+  },
+  {
+    "SetBet": "DP2-JP",
+    "SetName": "Secret of the Lakes (Mysterious Treasures)",
+    "Language": "JPN",
+    "TotalCards": "080",
+    "ReleaseYear": 2007
+  },
+  {
+    "SetBet": "DP3-JP",
+    "SetName": "Shining Darkness (Secret Wonders)",
+    "Language": "JPN",
+    "TotalCards": "075",
+    "ReleaseYear": 2007
+  },
+  {
+    "SetBet": "DP4-JP",
+    "SetName": "Moonlit Pursuit / Dawn Dash (Great Encounters)",
+    "Language": "JPN",
+    "TotalCards": "096",
+    "ReleaseYear": 2007
+  },
+  {
+    "SetBet": "DP5-JP",
+    "SetName": "Cry from the Mysterious / Temple of Anger (Majestic Dawn)",
+    "Language": "JPN",
+    "TotalCards": "096",
+    "ReleaseYear": 2008
+  },
+  {
+    "SetBet": "DP6-JP",
+    "SetName": "IFDS (Legends Awakened / Stormfront)",
+    "Language": "JPN",
+    "TotalCards": "092",
+    "ReleaseYear": 2008
+  },
+  {
+    "SetBet": "Pt1-JP",
+    "SetName": "Galactic's Conquest (Platinum)",
+    "Language": "JPN",
+    "TotalCards": "096",
+    "ReleaseYear": 2008
+  },
+  {
+    "SetBet": "Pt2-JP",
+    "SetName": "Bonds to the Time-Space (Rising Rivals)",
+    "Language": "JPN",
+    "TotalCards": "090",
+    "ReleaseYear": 2009
+  },
+  {
+    "SetBet": "Pt3-JP",
+    "SetName": "Beat of the Frontier (Supreme Victors)",
+    "Language": "JPN",
+    "TotalCards": "100",
+    "ReleaseYear": 2009
+  },
+  {
+    "SetBet": "Pt4-JP",
+    "SetName": "Advent of Arceus (Arceus)",
+    "Language": "JPN",
+    "TotalCards": "090",
+    "ReleaseYear": 2009
+  },
+  {
+    "SetBet": "L1-JP",
+    "SetName": "HeartGold Collection / SoulSilver Collection",
+    "Language": "JPN",
+    "TotalCards": "140",
+    "ReleaseYear": 2009
+  },
+  {
+    "SetBet": "L2-JP",
+    "SetName": "Revived Legends (HS Unleashed / Undaunted)",
+    "Language": "JPN",
+    "TotalCards": "080",
+    "ReleaseYear": 2010
+  },
+  {
+    "SetBet": "L3-JP",
+    "SetName": "Clash at the Summit (HS Triumphant)",
+    "Language": "JPN",
+    "TotalCards": "080",
+    "ReleaseYear": 2010
+  },
+  {
+    "SetBet": "LL-JP",
+    "SetName": "Lost Link",
+    "Language": "JPN",
+    "TotalCards": "040",
+    "ReleaseYear": 2010
+  },
+  {
+    "SetBet": "BW1-JP",
+    "SetName": "Black Collection / White Collection",
+    "Language": "JPN",
+    "TotalCards": "106",
+    "ReleaseYear": 2010
+  },
+  {
+    "SetBet": "BW2-JP",
+    "SetName": "Red Collection (Emerging Powers)",
+    "Language": "JPN",
+    "TotalCards": "066",
+    "ReleaseYear": 2011
+  },
+  {
+    "SetBet": "BW3-JP",
+    "SetName": "Psycho Drive / Hail Blizzard (Next Destinies)",
+    "Language": "JPN",
+    "TotalCards": "104",
+    "ReleaseYear": 2011
+  },
+  {
+    "SetBet": "BW4-JP",
+    "SetName": "Dark Rush (Dark Explorers)",
+    "Language": "JPN",
+    "TotalCards": "069",
+    "ReleaseYear": 2011
+  },
+  {
+    "SetBet": "BW5-JP",
+    "SetName": "Dragon Selection",
+    "Language": "JPN",
+    "TotalCards": "020",
+    "ReleaseYear": 2012
+  },
+  {
+    "SetBet": "BW6-JP",
+    "SetName": "Freeze Bolt / Cold Flare (Boundaries Crossed)",
+    "Language": "JPN",
+    "TotalCards": "118",
+    "ReleaseYear": 2012
+  },
+  {
+    "SetBet": "BW7-JP",
+    "SetName": "Plasma Gale (Plasma Storm)",
+    "Language": "JPN",
+    "TotalCards": "070",
+    "ReleaseYear": 2012
+  },
+  {
+    "SetBet": "BW8-JP",
+    "SetName": "Spiral Force / Thunder Knuckle (Plasma Freeze)",
+    "Language": "JPN",
+    "TotalCards": "102",
+    "ReleaseYear": 2012
+  },
+  {
+    "SetBet": "BW9-JP",
+    "SetName": "Megalo Cannon (Plasma Blast)",
+    "Language": "JPN",
+    "TotalCards": "076",
+    "ReleaseYear": 2013
+  },
+  {
+    "SetBet": "EBB-JP",
+    "SetName": "EX Battle Boost (Legendary Treasures)",
+    "Language": "JPN",
+    "TotalCards": "093",
+    "ReleaseYear": 2013
+  },
+  {
+    "SetBet": "XY1-JP",
+    "SetName": "Collection X / Collection Y (XY Base)",
+    "Language": "JPN",
+    "TotalCards": "120",
+    "ReleaseYear": 2013
+  },
+  {
+    "SetBet": "XY2-JP",
+    "SetName": "Wild Blaze (Flashfire)",
+    "Language": "JPN",
+    "TotalCards": "080",
+    "ReleaseYear": 2014
+  },
+  {
+    "SetBet": "XY3-JP",
+    "SetName": "Rising Fist (Furious Fists)",
+    "Language": "JPN",
+    "TotalCards": "096",
+    "ReleaseYear": 2014
+  },
+  {
+    "SetBet": "XY4-JP",
+    "SetName": "Phantom Gate (Phantom Forces)",
+    "Language": "JPN",
+    "TotalCards": "088",
+    "ReleaseYear": 2014
+  },
+  {
+    "SetBet": "XY5-JP",
+    "SetName": "Tidal Storm / Gaia Volcano (Primal Clash)",
+    "Language": "JPN",
+    "TotalCards": "140",
+    "ReleaseYear": 2014
+  },
+  {
+    "SetBet": "XY6-JP",
+    "SetName": "Emerald Break (Roaring Skies)",
+    "Language": "JPN",
+    "TotalCards": "078",
+    "ReleaseYear": 2015
+  },
+  {
+    "SetBet": "XY7-JP",
+    "SetName": "Bandit Ring (Ancient Origins)",
+    "Language": "JPN",
+    "TotalCards": "081",
+    "ReleaseYear": 2015
+  },
+  {
+    "SetBet": "XY8-JP",
+    "SetName": "Blue Shock / Red Flash (BREAKthrough)",
+    "Language": "JPN",
+    "TotalCards": "118",
+    "ReleaseYear": 2015
+  },
+  {
+    "SetBet": "XY9-JP",
+    "SetName": "Rage of the Broken Heavens (BREAKpoint)",
+    "Language": "JPN",
+    "TotalCards": "080",
+    "ReleaseYear": 2015
+  },
+  {
+    "SetBet": "XY10-JP",
+    "SetName": "Awakening Psychic King (Fates Collide)",
+    "Language": "JPN",
+    "TotalCards": "078",
+    "ReleaseYear": 2016
+  },
+  {
+    "SetBet": "XY11-JP",
+    "SetName": "Fever-Burst Fighter / Cruel Traitor (Steam Siege)",
+    "Language": "JPN",
+    "TotalCards": "108",
+    "ReleaseYear": 2016
+  },
+  {
+    "SetBet": "CP6-JP",
+    "SetName": "Expansion Pack 20th Anniversary (Evolutions)",
+    "Language": "JPN",
+    "TotalCards": "087",
+    "ReleaseYear": 2016
+  },
+  {
+    "SetBet": "SM1S-JP",
+    "SetName": "Collection Sun",
+    "Language": "JPN",
+    "TotalCards": "060",
+    "ReleaseYear": 2016
+  },
+  {
+    "SetBet": "SM1M-JP",
+    "SetName": "Collection Moon",
+    "Language": "JPN",
+    "TotalCards": "060",
+    "ReleaseYear": 2016
+  },
+  {
+    "SetBet": "SM2K-JP",
+    "SetName": "Islands Await You (Guardians Rising)",
+    "Language": "JPN",
+    "TotalCards": "050",
+    "ReleaseYear": 2017
+  },
+  {
+    "SetBet": "SM2L-JP",
+    "SetName": "Alolan Moonlight (Guardians Rising)",
+    "Language": "JPN",
+    "TotalCards": "050",
+    "ReleaseYear": 2017
+  },
+  {
+    "SetBet": "SM3H-JP",
+    "SetName": "To Have Seen the Battle Rainbow (Burning Shadows)",
+    "Language": "JPN",
+    "TotalCards": "051",
+    "ReleaseYear": 2017
+  },
+  {
+    "SetBet": "SM3N-JP",
+    "SetName": "Darkness That Consumes Light (Burning Shadows)",
+    "Language": "JPN",
+    "TotalCards": "051",
+    "ReleaseYear": 2017
+  }
+]

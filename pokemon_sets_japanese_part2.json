@@ -1,0 +1,499 @@
+[
+  {
+    "SetBet": "SM3+-JP",
+    "SetName": "Shining Legends",
+    "Language": "JPN",
+    "TotalCards": "072",
+    "ReleaseYear": 2017
+  },
+  {
+    "SetBet": "SM4S-JP",
+    "SetName": "Awakening of the Sky-Bursting Giants (Crimson Invasion)",
+    "Language": "JPN",
+    "TotalCards": "050",
+    "ReleaseYear": 2017
+  },
+  {
+    "SetBet": "SM4A-JP",
+    "SetName": "Ultradimensional Beasts (Crimson Invasion)",
+    "Language": "JPN",
+    "TotalCards": "050",
+    "ReleaseYear": 2017
+  },
+  {
+    "SetBet": "SM5S-JP",
+    "SetName": "Ultra Sun (Ultra Prism)",
+    "Language": "JPN",
+    "TotalCards": "066",
+    "ReleaseYear": 2017
+  },
+  {
+    "SetBet": "SM5M-JP",
+    "SetName": "Ultra Moon (Ultra Prism)",
+    "Language": "JPN",
+    "TotalCards": "066",
+    "ReleaseYear": 2017
+  },
+  {
+    "SetBet": "SM6-JP",
+    "SetName": "Forbidden Light",
+    "Language": "JPN",
+    "TotalCards": "094",
+    "ReleaseYear": 2018
+  },
+  {
+    "SetBet": "SM7-JP",
+    "SetName": "Charisma of the Wrecked Sky (Celestial Storm)",
+    "Language": "JPN",
+    "TotalCards": "096",
+    "ReleaseYear": 2018
+  },
+  {
+    "SetBet": "SM7a-JP",
+    "SetName": "Dragon Storm (Dragon Majesty)",
+    "Language": "JPN",
+    "TotalCards": "053",
+    "ReleaseYear": 2018
+  },
+  {
+    "SetBet": "SM8-JP",
+    "SetName": "Super-Burst Impact (Lost Thunder)",
+    "Language": "JPN",
+    "TotalCards": "095",
+    "ReleaseYear": 2018
+  },
+  {
+    "SetBet": "SM8b-JP",
+    "SetName": "Ultra Shiny GX (Hidden Fates)",
+    "Language": "JPN",
+    "TotalCards": "150",
+    "ReleaseYear": 2018
+  },
+  {
+    "SetBet": "SM9-JP",
+    "SetName": "Tag Bolt (Team Up)",
+    "Language": "JPN",
+    "TotalCards": "095",
+    "ReleaseYear": 2018
+  },
+  {
+    "SetBet": "SM9a-JP",
+    "SetName": "Night Unison (Unbroken Bonds)",
+    "Language": "JPN",
+    "TotalCards": "055",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "SM9b-JP",
+    "SetName": "Full Metal Wall (Unbroken Bonds)",
+    "Language": "JPN",
+    "TotalCards": "054",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "SM10-JP",
+    "SetName": "Double Blaze (Unbroken Bonds)",
+    "Language": "JPN",
+    "TotalCards": "095",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "SM10a-JP",
+    "SetName": "GG End (Unified Minds)",
+    "Language": "JPN",
+    "TotalCards": "054",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "SM10b-JP",
+    "SetName": "Sky Legend (Unified Minds)",
+    "Language": "JPN",
+    "TotalCards": "054",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "SM11-JP",
+    "SetName": "Miracle Twin (Unified Minds)",
+    "Language": "JPN",
+    "TotalCards": "094",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "SM11a-JP",
+    "SetName": "Remix Bout (Cosmic Eclipse)",
+    "Language": "JPN",
+    "TotalCards": "064",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "SM11b-JP",
+    "SetName": "Dream League (Cosmic Eclipse)",
+    "Language": "JPN",
+    "TotalCards": "049",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "SM12-JP",
+    "SetName": "Alter Genesis (Cosmic Eclipse)",
+    "Language": "JPN",
+    "TotalCards": "095",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "SM12a-JP",
+    "SetName": "Tag All Stars",
+    "Language": "JPN",
+    "TotalCards": "173",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "S1W-JP",
+    "SetName": "Sword (Sword & Shield Base)",
+    "Language": "JPN",
+    "TotalCards": "060",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "S1H-JP",
+    "SetName": "Shield (Sword & Shield Base)",
+    "Language": "JPN",
+    "TotalCards": "060",
+    "ReleaseYear": 2019
+  },
+  {
+    "SetBet": "S1a-JP",
+    "SetName": "VMAX Rising (Rebel Clash)",
+    "Language": "JPN",
+    "TotalCards": "070",
+    "ReleaseYear": 2020
+  },
+  {
+    "SetBet": "S2-JP",
+    "SetName": "Rebellion Crash (Rebel Clash)",
+    "Language": "JPN",
+    "TotalCards": "096",
+    "ReleaseYear": 2020
+  },
+  {
+    "SetBet": "S2a-JP",
+    "SetName": "World Down (Darkness Ablaze)",
+    "Language": "JPN",
+    "TotalCards": "070",
+    "ReleaseYear": 2020
+  },
+  {
+    "SetBet": "S3-JP",
+    "SetName": "Infinity Zone (Darkness Ablaze)",
+    "Language": "JPN",
+    "TotalCards": "100",
+    "ReleaseYear": 2020
+  },
+  {
+    "SetBet": "S3a-JP",
+    "SetName": "Legendary Heartbeat (Vivid Voltage)",
+    "Language": "JPN",
+    "TotalCards": "076",
+    "ReleaseYear": 2020
+  },
+  {
+    "SetBet": "S4-JP",
+    "SetName": "Amazing Volt Tackle (Vivid Voltage)",
+    "Language": "JPN",
+    "TotalCards": "100",
+    "ReleaseYear": 2020
+  },
+  {
+    "SetBet": "S4a-JP",
+    "SetName": "Shiny Star V (Shining Fates)",
+    "Language": "JPN",
+    "TotalCards": "190",
+    "ReleaseYear": 2020
+  },
+  {
+    "SetBet": "S5I-JP",
+    "SetName": "Single Strike Master (Battle Styles)",
+    "Language": "JPN",
+    "TotalCards": "070",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S5R-JP",
+    "SetName": "Rapid Strike Master (Battle Styles)",
+    "Language": "JPN",
+    "TotalCards": "070",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S5a-JP",
+    "SetName": "Matchless Fighters (Chilling Reign)",
+    "Language": "JPN",
+    "TotalCards": "070",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S6H-JP",
+    "SetName": "Silver Lance (Chilling Reign)",
+    "Language": "JPN",
+    "TotalCards": "070",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S6K-JP",
+    "SetName": "Jet-Black Spirit (Chilling Reign)",
+    "Language": "JPN",
+    "TotalCards": "070",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S6a-JP",
+    "SetName": "Eevee Heroes (Evolving Skies)",
+    "Language": "JPN",
+    "TotalCards": "069",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S7D-JP",
+    "SetName": "Skyscraping Perfect (Evolving Skies)",
+    "Language": "JPN",
+    "TotalCards": "067",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S7R-JP",
+    "SetName": "Blue Sky Stream (Evolving Skies)",
+    "Language": "JPN",
+    "TotalCards": "067",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S8-JP",
+    "SetName": "Fusion Arts (Fusion Strike)",
+    "Language": "JPN",
+    "TotalCards": "100",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S8a-JP",
+    "SetName": "25th Anniversary Collection (Celebrations)",
+    "Language": "JPN",
+    "TotalCards": "028",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S8b-JP",
+    "SetName": "VMAX Climax (Brilliant Stars)",
+    "Language": "JPN",
+    "TotalCards": "184",
+    "ReleaseYear": 2021
+  },
+  {
+    "SetBet": "S9-JP",
+    "SetName": "Star Birth (Brilliant Stars)",
+    "Language": "JPN",
+    "TotalCards": "100",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "S9a-JP",
+    "SetName": "Battle Region (Astral Radiance)",
+    "Language": "JPN",
+    "TotalCards": "067",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "S10D-JP",
+    "SetName": "Time Gazer (Astral Radiance)",
+    "Language": "JPN",
+    "TotalCards": "067",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "S10P-JP",
+    "SetName": "Space Juggler (Astral Radiance)",
+    "Language": "JPN",
+    "TotalCards": "067",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "S10a-JP",
+    "SetName": "Dark Phantasma (Lost Origin)",
+    "Language": "JPN",
+    "TotalCards": "071",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "S10b-JP",
+    "SetName": "Pokemon GO",
+    "Language": "JPN",
+    "TotalCards": "071",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "S11-JP",
+    "SetName": "Lost Abyss (Lost Origin)",
+    "Language": "JPN",
+    "TotalCards": "100",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "S11a-JP",
+    "SetName": "Incandescent Arcana (Silver Tempest)",
+    "Language": "JPN",
+    "TotalCards": "068",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "S12-JP",
+    "SetName": "Paradigm Trigger (Silver Tempest)",
+    "Language": "JPN",
+    "TotalCards": "098",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "S12a-JP",
+    "SetName": "VSTAR Universe (Crown Zenith)",
+    "Language": "JPN",
+    "TotalCards": "172",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "SV1S",
+    "SetName": "Scarlet ex",
+    "Language": "JPN",
+    "TotalCards": "078",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV1V",
+    "SetName": "Violet ex",
+    "Language": "JPN",
+    "TotalCards": "078",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV1a",
+    "SetName": "Triplet Beat",
+    "Language": "JPN",
+    "TotalCards": "073",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV2P",
+    "SetName": "Snow Hazard",
+    "Language": "JPN",
+    "TotalCards": "071",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV2D",
+    "SetName": "Clay Burst",
+    "Language": "JPN",
+    "TotalCards": "071",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV2a",
+    "SetName": "Pokemon Card 151",
+    "Language": "JPN",
+    "TotalCards": "165",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV3",
+    "SetName": "Ruler of the Black Flame",
+    "Language": "JPN",
+    "TotalCards": "108",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV3a",
+    "SetName": "Raging Surf",
+    "Language": "JPN",
+    "TotalCards": "062",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV4K",
+    "SetName": "Ancient Roar",
+    "Language": "JPN",
+    "TotalCards": "066",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV4M",
+    "SetName": "Future Flash",
+    "Language": "JPN",
+    "TotalCards": "066",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV4a",
+    "SetName": "Shiny Treasure ex",
+    "Language": "JPN",
+    "TotalCards": "190",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "SV5M",
+    "SetName": "Cyber Judge",
+    "Language": "JPN",
+    "TotalCards": "071",
+    "ReleaseYear": 2024
+  },
+  {
+    "SetBet": "SV5K",
+    "SetName": "Wild Force",
+    "Language": "JPN",
+    "TotalCards": "071",
+    "ReleaseYear": 2024
+  },
+  {
+    "SetBet": "SV5a",
+    "SetName": "Crimson Haze",
+    "Language": "JPN",
+    "TotalCards": "066",
+    "ReleaseYear": 2024
+  },
+  {
+    "SetBet": "SV6",
+    "SetName": "Transformation Mask",
+    "Language": "JPN",
+    "TotalCards": "101",
+    "ReleaseYear": 2024
+  },
+  {
+    "SetBet": "SV6a",
+    "SetName": "Night Wanderer",
+    "Language": "JPN",
+    "TotalCards": "064",
+    "ReleaseYear": 2024
+  },
+  {
+    "SetBet": "SV7",
+    "SetName": "Stellar Miracle",
+    "Language": "JPN",
+    "TotalCards": "102",
+    "ReleaseYear": 2024
+  },
+  {
+    "SetBet": "SV7a",
+    "SetName": "Paradise Dragona",
+    "Language": "JPN",
+    "TotalCards": "064",
+    "ReleaseYear": 2024
+  },
+  {
+    "SetBet": "SV8",
+    "SetName": "Super Electric Breaker",
+    "Language": "JPN",
+    "TotalCards": "106",
+    "ReleaseYear": 2024
+  },
+  {
+    "SetBet": "SV8a",
+    "SetName": "Terestal Festival ex",
+    "Language": "JPN",
+    "TotalCards": "187",
+    "ReleaseYear": 2024
+  }
+]
