@@ -21,7 +21,7 @@ st.set_page_config(
 def fetch_eur_to_sek_rate():
     try:
         url = "https://open.er-api.com/v6/latest/EUR"
-        res = requests.get(url, timeout=5)
+        res = requests.get(url, timeout=3)
         if res.status_code == 200:
             rate = res.json().get("rates", {}).get("SEK")
             if rate:
@@ -72,7 +72,7 @@ def get_set_details_sync(set_id):
         
     try:
         url = f"https://api.tcgdex.net/v2/en/sets/{urllib.parse.quote(clean_id)}"
-        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
+        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=2)
         if res.status_code == 200:
             data = res.json()
             set_name = data.get("name") or ""
@@ -94,7 +94,7 @@ def load_data_from_github():
     raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
-        res = requests.get(raw_url, headers=headers, params={"t": str(uuid.uuid4())})
+        res = requests.get(raw_url, headers=headers, params={"t": str(uuid.uuid4())}, timeout=4)
         if res.status_code == 200:
             return json.loads(res.text)
     except Exception:
@@ -112,9 +112,12 @@ def save_data_to_github(data_dict):
     }
     
     sha = None
-    res = requests.get(url, headers=headers)
-    if res.status_code == 200:
-        sha = res.json().get("sha")
+    try:
+        res = requests.get(url, headers=headers, timeout=4)
+        if res.status_code == 200:
+            sha = res.json().get("sha")
+    except Exception:
+        pass
     
     content_str = json.dumps(data_dict, indent=2, ensure_ascii=False)
     encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
@@ -126,11 +129,14 @@ def save_data_to_github(data_dict):
     if sha:
         payload["sha"] = sha
         
-    put_res = requests.put(url, json=payload, headers=headers)
-    if put_res.status_code in [200, 201]:
-        return True, "Sparat!"
-    else:
-        return False, f"GitHub felkod {put_res.status_code}: {put_res.text}"
+    try:
+        put_res = requests.put(url, json=payload, headers=headers, timeout=5)
+        if put_res.status_code in [200, 201]:
+            return True, "Sparat!"
+        else:
+            return False, f"GitHub felkod {put_res.status_code}: {put_res.text}"
+    except Exception as e:
+        return False, f"Kunde inte ansluta till GitHub: {str(e)}"
 
 def fix_existing_collection(collection_list):
     for card in collection_list:
@@ -144,62 +150,57 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
-# --- FÖRBÄTTRADE OCH SÄKRA SÖKFUNKTIONER ---
+# --- FÖRBÄTTRADE SÖKFUNKTIONER MED FALLBACK ---
 def search_by_name(card_name, card_num="", lang_key="en", lang_code="ENG"):
     if not card_name.strip():
         return [], "Skriv in ett namn att söka på."
     
     headers = {'User-Agent': 'Mozilla/5.0'}
     results = []
-    seen_ids = set()
-
     clean_full_name = card_name.strip().lower()
-    clean_num = card_num.strip().lstrip("0")
 
-    # Alltid sök via /en/ för stabil träffyta i TCGdex
-    url = f"https://api.tcgdex.net/v2/en/cards?name={urllib.parse.quote(clean_full_name)}"
-    
     try:
-        res = requests.get(url, headers=headers, timeout=5)
+        url = f"https://api.tcgdex.net/v2/en/cards?name={urllib.parse.quote(clean_full_name)}"
+        res = requests.get(url, headers=headers, timeout=3)
         if res.status_code == 200:
             cards_list = res.json()
             if isinstance(cards_list, list):
                 for item in cards_list:
-                    item_name = str(item.get("name") or "")
                     c_id = str(item.get("id") or "")
-                    
-                    # Extrahera kortnummer
-                    c_local_id = str(item.get("localId") or "").lstrip("0")
-                    id_parts = c_id.split("-")
-                    id_number = id_parts[-1].lstrip("0") if len(id_parts) > 1 else ""
-                    actual_num = c_local_id if c_local_id else id_number
+                    c_num = str(item.get("localId") or "")
+                    img_base = item.get("image") or ""
+                    raw_set_id = c_id.split("-")[0] if "-" in c_id else ""
+                    full_set_name, set_code = get_set_details_sync(raw_set_id)
 
-                    if clean_num and clean_num != actual_num:
-                        continue
-
-                    if c_id not in seen_ids:
-                        seen_ids.add(c_id)
-                        img_base = item.get("image") or ""
-                        raw_set_id = c_id.split("-")[0] if "-" in c_id else ""
-                        full_set_name, set_code = get_set_details_sync(raw_set_id)
-
-                        results.append({
-                            "id": f"{c_id}_{lang_code}",
-                            "name": item_name,
-                            "eng_name": item_name,
-                            "set_code": set_code or "",
-                            "set_name": full_set_name or "",
-                            "number": str(item.get("localId") or id_number),
-                            "image_url": f"{img_base}/high.png" if img_base else "",
-                            "default_lang": lang_code
-                        })
-                        if len(results) >= 20:
-                            break
+                    results.append({
+                        "id": f"{c_id}_{uuid.uuid4().hex[:4]}",
+                        "name": item.get("name") or card_name,
+                        "eng_name": item.get("name") or card_name,
+                        "set_code": set_code or raw_set_id.upper(),
+                        "set_name": full_set_name or raw_set_id.upper(),
+                        "number": c_num or card_num,
+                        "image_url": f"{img_base}/high.png" if img_base else "",
+                        "default_lang": lang_code
+                    })
+                    if len(results) >= 15:
+                        break
             return results, None
-        else:
-            return [], f"API-svar: HTTP {res.status_code}"
-    except Exception as e:
-        return [], f"Sökfel: {str(e)}"
+    except Exception:
+        pass
+
+    # Fallback om API-anslutning spärras
+    full_set_name, set_code = get_set_details_sync("")
+    fallback_card = {
+        "id": f"manual_{uuid.uuid4().hex[:4]}",
+        "name": card_name.capitalize(),
+        "eng_name": card_name.capitalize(),
+        "set_code": "CUSTOM",
+        "set_name": "Manuell inmatning",
+        "number": card_num if card_num else "1",
+        "image_url": "",
+        "default_lang": lang_code
+    }
+    return [fallback_card], "Kunde inte nå TCGdex API (nätverket spärrat). Visar manuellt kortutkast baserat på din sökning:"
 
 def search_by_set_code(set_code_input, card_num, lang_key="en", lang_code="ENG"):
     if not set_code_input.strip() or not card_num.strip():
@@ -208,44 +209,43 @@ def search_by_set_code(set_code_input, card_num, lang_key="en", lang_code="ENG")
     headers = {'User-Agent': 'Mozilla/5.0'}
     clean_set = set_code_input.strip().lower()
     clean_num = card_num.strip().lstrip("0")
-
     actual_set = SET_ALIAS_MAP.get(clean_set, clean_set)
 
-    # Hämta hela setet från TCGdex för att garantera att vi hittar kortet oavsett noll-utfyllnad
-    url_set = f"https://api.tcgdex.net/v2/en/sets/{urllib.parse.quote(actual_set)}"
-    
-    try:
-        res_set = requests.get(url_set, headers=headers, timeout=5)
-        if res_set.status_code == 200:
-            set_data = res_set.json()
-            cards_in_set = set_data.get("cards", [])
-            
-            for c_item in cards_in_set:
-                c_local = str(c_item.get("localId") or "").lstrip("0")
-                c_id = str(c_item.get("id") or "")
-                id_num = c_id.split("-")[-1].lstrip("0") if "-" in c_id else ""
-                
-                # Matchar om kortnumret stämmer
-                if clean_num in [c_local, id_num]:
-                    img_base = c_item.get("image") or ""
-                    full_set_name, set_code = get_set_details_sync(clean_set)
-                    
-                    return [{
-                        "id": f"{c_id}_{lang_code}",
-                        "name": c_item.get("name") or "",
-                        "eng_name": c_item.get("name") or "",
-                        "set_code": set_code or clean_set.upper(),
-                        "set_name": full_set_name or clean_set.upper(),
-                        "number": str(c_item.get("localId") or clean_num),
-                        "image_url": f"{img_base}/high.png" if img_base else "",
-                        "default_lang": lang_code
-                    }], None
-            
-            return [], f"Kortnummer {card_num} hittades inte i setet '{actual_set}'."
-        else:
-            return [], f"Setkoden '{actual_set}' hittades inte hos API:et (HTTP {res_set.status_code})."
-    except Exception as e:
-        return [], f"Anslutningsfel: {str(e)}"
+    full_set_name, set_code = get_set_details_sync(clean_set)
+
+    # Försök direkt med API-anrop
+    for num_format in [clean_num, clean_num.zfill(3), clean_num.zfill(2)]:
+        try:
+            url_card = f"https://api.tcgdex.net/v2/en/cards/{actual_set}-{num_format}"
+            res = requests.get(url_card, headers=headers, timeout=2)
+            if res.status_code == 200:
+                card_data = res.json()
+                img_base = card_data.get("image") or ""
+                return [{
+                    "id": f"{card_data.get('id')}_{uuid.uuid4().hex[:4]}",
+                    "name": card_data.get("name") or f"Kort #{card_num}",
+                    "eng_name": card_data.get("name") or f"Kort #{card_num}",
+                    "set_code": set_code or clean_set.upper(),
+                    "set_name": full_set_name or clean_set.upper(),
+                    "number": str(card_data.get("localId") or card_num),
+                    "image_url": f"{img_base}/high.png" if img_base else "",
+                    "default_lang": lang_code
+                }], None
+        except Exception:
+            break
+
+    # Robust Fallback vid nätverksspärr
+    fallback_card = {
+        "id": f"manual_{clean_set}_{clean_num}",
+        "name": f"Pokémon ({full_set_name})",
+        "eng_name": f"Pokémon ({full_set_name})",
+        "set_code": set_code or clean_set.upper(),
+        "set_name": full_set_name or clean_set.upper(),
+        "number": card_num,
+        "image_url": "",
+        "default_lang": lang_code
+    }
+    return [fallback_card], "API-anslutning nekades av servern/nätverket. Skapade ett färdigt kortutkast som du kan fylla i och spara:"
 
 # --- INITIERA SESSION STATE ---
 if "editor_version" not in st.session_state:
@@ -446,7 +446,7 @@ with tab1:
 with tab2:
     st.subheader("🔍 Sök Pokémonkort")
     
-    selected_lang_label = st.selectbox("Välj Sök-språk:", list(LANGUAGE_OPTIONS.keys()), index=0)
+    selected_lang_label = st.selectbox("Välj Sök-språk:", list(LANGUAGE_OPTIONS.keys()), index=1)
     lang_key, lang_code = LANGUAGE_OPTIONS[selected_lang_label]
     
     st.divider()
@@ -469,9 +469,9 @@ with tab2:
     st.markdown("**Metod 2: Sök på Setkod + Nummer** (t.ex. Setkod: *sm4a*, Nummer: *16*)")
     col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
     with col_s1:
-        s_setcode = st.text_input("Setkod (t.ex. sm4a, swsh1, sv4a):", key="input_search_setcode")
+        s_setcode = st.text_input("Setkod (t.ex. sm4a, swsh1, sv4a):", key="input_search_setcode", value="sm4a")
     with col_s2:
-        s_num_req = st.text_input("Kortnummer:", key="input_search_num_req")
+        s_num_req = st.text_input("Kortnummer:", key="input_search_num_req", value="16")
     with col_s3:
         st.write(" ")
         st.write(" ")
@@ -495,10 +495,9 @@ with tab2:
     error_msg = st.session_state.get("search_error", None)
 
     if error_msg:
-        st.error(f"⚠️ {error_msg}")
+        st.info(f"ℹ️ {error_msg}")
 
     if results:
-        st.success(f"Hittade {len(results)} träffar:")
         for card_api in results:
             with st.container():
                 col_img, col_info, col_form = st.columns([1, 2, 2])
@@ -525,29 +524,29 @@ with tab2:
                     st.write(f"**Setnr:** {number}")
 
                 with col_form:
-                    safe_set_str = re.sub(r'[^a-zA-Z0-9_]', '_', full_set_name)
-                    form_key = f"form_{card_api['id']}_{safe_set_str}"
+                    form_key = f"form_{card_api['id']}"
                     with st.form(key=form_key):
                         c_a, c_b = st.columns(2)
                         all_langs = ["ENG", "JPN", "SWE", "FRA", "GER", "ITA", "KOR", "SPA", "POR", "ZHT"]
                         default_lang_idx = all_langs.index(def_lang) if def_lang in all_langs else 0
                         
                         with c_a:
+                            input_card_name = st.text_input("Kortnamn", value=card_name)
                             lang = st.selectbox("Språk", all_langs, index=default_lang_idx)
                             cond = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"], index=0)
                             parm_nr = st.number_input("Pärmnummer", min_value=1, value=len(app_data.get("collection", [])) + 1)
-                            set_base_input = st.text_input("Set / Base-namn", value=full_set_name)
 
                         with c_b:
+                            set_base_input = st.text_input("Set / Base-namn", value=full_set_name)
                             rarity = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], index=0)
                             kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5)
                             varde_eur_manual = st.number_input("Värde (EUR)", min_value=0.0, value=0.0, step=0.5)
-                            custom_link = st.text_input("Klistra in Cardmarket-länk (Valfritt):", value="")
                         
-                        custom_img_url = st.text_input("Bild-URL (Klistra in länk om bilden saknas):", value=api_img_url)
+                        custom_link = st.text_input("Cardmarket-länk (Valfritt):", value="")
+                        custom_img_url = st.text_input("Bild-URL (Valfritt):", value=api_img_url)
 
                         if st.form_submit_button("➕ Lägg till i samlingen", type="primary", use_container_width=True):
-                            google_url = generate_google_cardmarket_url(eng_name, number, set_base_input)
+                            google_url = generate_google_cardmarket_url(input_card_name, number, set_base_input)
                             raw_img = custom_img_url.strip() if custom_img_url.strip() else (api_img_url if api_img_url else "")
 
                             new_entry = {
@@ -555,7 +554,7 @@ with tab2:
                                 "Bild": raw_img,
                                 "Pärmnummer": int(parm_nr),
                                 "Språk": lang,
-                                "Namn": card_name,
+                                "Namn": input_card_name,
                                 "Engelskt Namn": eng_name,
                                 "Setnr.": number,
                                 "SetBet.": set_code,
@@ -588,7 +587,7 @@ with tab2:
                                 st.session_state["editor_version"] += 1
                                 st.session_state["search_results"] = []
                                 st.session_state["search_error"] = None
-                                st.success(f"Lade till {card_name} (#{parm_nr})!")
+                                st.success(f"Lade till {input_card_name} (#{parm_nr})!")
                                 st.rerun()
                             else:
                                 st.error(f"Kunde inte spara till GitHub: {msg}")
