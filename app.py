@@ -140,10 +140,10 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
-# --- Blixtsnabb och flexibel sökfunktion ---
-@st.cache_data(ttl=3600)
+# --- OPTIMERAD OCH TILLFÖRLITLIG SÖKFUNKTION ---
+@st.cache_data(ttl=3600, max_entries=100)
 def search_pokemon_cards(query):
-    if not query:
+    if not query or len(query.strip()) < 2:
         return []
     
     query_clean = query.strip().lower()
@@ -154,84 +154,91 @@ def search_pokemon_cards(query):
     if not words:
         return []
 
-    # Särskilj siffror/nummer från namnord
+    # Särskilj siffror från bokstäver/text
     numbers = [w.lstrip("0") for w in words if w.isdigit()]
     text_words = [w for w in words if not w.isdigit()]
-    
-    # Söktermen som skickas till API:et (prioritera textordet, t.ex. "raichu")
-    main_search_term = text_words[0] if text_words else words[0]
 
     headers = {'User-Agent': 'Mozilla/5.0'}
     results = []
     seen_ids = set()
 
-    LANG_CODES = {
-        "en": "ENG", "ja": "JPN", "fr": "FRA", "de": "GER", 
-        "es": "SPA", "it": "ITA", "pt": "POR", "ko": "KOR", "zh-tw": "ZHT"
-    }
+    LANG_CODES = [("en", "ENG"), ("ja", "JPN"), ("fr", "FRA"), ("de", "GER")]
 
-    # Hämta engelska namn-mappningen snabbt
-    eng_cards_map = {}
-    try:
-        res_eng = requests.get(f"https://api.tcgdex.net/v2/en/cards?name={urllib.parse.quote(main_search_term)}", headers=headers, timeout=3)
-        if res_eng.status_code == 200:
-            for c in res_eng.json():
-                if c.get("id"):
-                    eng_cards_map[c.get("id")] = c.get("name") or ""
-    except Exception:
-        pass
+    # Sökterm som skickas till TCGdex API (textordet, t.ex. "raichu")
+    search_term = text_words[0] if text_words else words[0]
 
-    # Sök över språken med direkt-sökning i API:et
-    for lang_key, lang_code in LANG_CODES.items():
+    for lang_key, lang_code in LANG_CODES:
         try:
-            url_tcgdex = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(main_search_term)}"
-            res_dex = requests.get(url_tcgdex, headers=headers, timeout=3)
+            # 1. Om det är en sökning som kan vara ett ID (t.ex. "sm4a 016" -> "sm4a-016" eller "sm4a-16")
+            if len(words) >= 2:
+                possible_id = f"{words[0]}-{words[1]}"
+                url_direct = f"https://api.tcgdex.net/v2/{lang_key}/cards/{urllib.parse.quote(possible_id)}"
+                res_direct = requests.get(url_direct, headers=headers, timeout=2)
+                if res_direct.status_code == 200:
+                    item = res_direct.json()
+                    if isinstance(item, dict) and item.get("id"):
+                        card_id = str(item.get("id"))
+                        img_base = item.get("image") or ""
+                        raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
+                        full_set_name, set_code = get_set_details_sync(raw_set_id)
+                        
+                        results.append({
+                            "id": f"{card_id}_{lang_code}",
+                            "name": item.get("name") or "",
+                            "eng_name": item.get("name") or "",
+                            "set_code": set_code or "",
+                            "set_name": full_set_name or "",
+                            "number": str(item.get("localId") or ""),
+                            "image_url": f"{img_base}/high.png" if img_base else "",
+                            "default_lang": lang_code
+                        })
+                        return results
+
+            # 2. Riktad sökning på namnet mot TCGdex API
+            url_search = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(search_term)}"
+            res_search = requests.get(url_search, headers=headers, timeout=3)
             
-            if res_dex.status_code == 200:
-                cards_list = res_dex.json()
+            if res_search.status_code == 200:
+                cards_list = res_search.json()
                 if isinstance(cards_list, list):
                     for item in cards_list:
                         c_id = str(item.get("id") or "").lower()
                         c_name = str(item.get("name") or "").lower()
-                        c_local = str(item.get("localId") or "").lower()
-                        c_local_clean = c_local.lstrip("0")
+                        c_local = str(item.get("localId") or "").lower().lstrip("0")
                         
-                        # Matcha textord mot namn/ID
-                        text_matches = all(w in c_name or w in c_id for w in text_words)
+                        # Kontrollera att alla textord finns med i namnet eller ID:t
+                        text_match = all(tw in c_name or tw in c_id for tw in text_words)
                         
-                        # Matcha nummer mot localId om ett nummer angavs i sökningen
-                        num_matches = True
+                        # Om siffror/nummer angavs, kontrollera att numret matchar kortets localId
+                        num_match = True
                         if numbers:
-                            num_matches = any(n in c_local or n == c_local_clean for n in numbers)
-                            
-                        if text_matches and num_matches:
+                            num_match = any(num == c_local or num in c_id.split("-")[-1] for num in numbers)
+
+                        if text_match and num_match:
                             card_id = str(item.get("id") or "")
                             unique_key = f"{card_id}_{lang_code}"
                             
                             if unique_key not in seen_ids:
                                 seen_ids.add(unique_key)
                                 img_base = item.get("image") or ""
-                                img_url = f"{img_base}/high.png" if img_base else ""
-                                
                                 raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
                                 full_set_name, set_code = get_set_details_sync(raw_set_id)
-                                
-                                eng_name = eng_cards_map.get(card_id, item.get("name") or "")
 
                                 results.append({
                                     "id": unique_key,
                                     "name": item.get("name") or "",
-                                    "eng_name": eng_name,
+                                    "eng_name": item.get("name") or "",
                                     "set_code": set_code or "",
                                     "set_name": full_set_name or "",
-                                    "number": c_local,
-                                    "image_url": img_url,
+                                    "number": str(item.get("localId") or ""),
+                                    "image_url": f"{img_base}/high.png" if img_base else "",
                                     "default_lang": lang_code
                                 })
                                 if len(results) >= 20:
                                     break
         except Exception:
             pass
+            
         if len(results) >= 20:
             break
 
@@ -540,3 +547,5 @@ with tab2:
                                 else:
                                     st.error(f"Kunde inte spara till GitHub: {msg}")
                     st.divider()
+        else:
+            st.warning("Inga kort hittades för din sökning. Prova att söka på enbart kortets namn (t.ex. 'Raichu') eller en exakt ID-kod (t.ex. 'sm4a-016').")
