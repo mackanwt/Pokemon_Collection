@@ -150,109 +150,108 @@ def generate_google_cardmarket_url(name, number, set_name):
     query = f"{clean_name} {number or ''} {set_name or ''} cardmarket"
     return f"https://www.google.com/search?q={urllib.parse.quote(query)}"
 
-# --- FÖRBÄTTRAD, FLEXIBEL SÖKFUNKTION FOR ENGELSKA & JAPANSKA KORT ---
+# --- KORRIGERAD SÖKFUNKTION MED DIREKT-ID FÖR JAPANSKA OCH ENGELSKA KORT ---
 @st.cache_data(ttl=3600, max_entries=100)
 def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
-    if not query or len(query.strip()) < 2:
+    if not query or len(query.strip()) < 1:
         return []
 
     headers = {'User-Agent': 'Mozilla/5.0'}
     results = []
     seen_ids = set()
 
-    clean_query = query.strip().lower()
-    
-    # 1. KÄNDA SET-ALIAS OCH SPECIALMAPPANINGAR
-    SET_ALIAS_MAP = {
-        "sm4a": ["sm4plus", "sm4+"],
-        "sm4b": ["sm4b"],
-        "sm8b": ["sm8b"],
-        "sm12a": ["sm12a"],
-        "s12a": ["s12a"],
-        "sv4a": ["sv4a"]
-    }
-
+    clean_query = query.strip()
     words = clean_query.split()
+    
     numbers = [w.lstrip("0") for w in words if w.isdigit()]
-    text_words = [w for w in words if not w.isdigit()]
+    text_words = [w.lower() for w in words if not w.isdigit()]
 
-    # METOD A: Om användaren anger "set nr" (t.ex. "sm4a 016" eller "swsh1 1")
+    # 1. DIREKTSÖKNING PÅ KORT-ID (t.ex. "sm4a 016", "sm4a-16", "sv4a 001")
+    # Detta täcker både japanska och engelska direktanrop mot TCGdex
     if text_words and numbers:
-        raw_set = text_words[0]
-        num_target = numbers[0]
-        target_sets = SET_ALIAS_MAP.get(raw_set, [raw_set])
+        set_id = text_words[0]
+        num = numbers[0]
+        
+        # Generera varianter av ID (t.ex. sm4a-16 och sm4a-016)
+        id_candidates = [
+            f"{set_id}-{num}",
+            f"{set_id}-{num.zfill(3)}",
+            f"{set_id}-{num.zfill(2)}"
+        ]
 
-        for s_id in target_sets:
-            for test_num in [num_target, num_target.zfill(2), num_target.zfill(3)]:
+        # Testa valt språk samt automatiskt 'ja' och 'en' om det saknas
+        langs_to_test = [lang_key]
+        if "ja" not in langs_to_test:
+            langs_to_test.append("ja")
+        if "en" not in langs_to_test:
+            langs_to_test.append("en")
+
+        for l_key in langs_to_test:
+            for cand_id in id_candidates:
                 try:
-                    card_exact_id = f"{s_id}-{test_num}"
-                    url = f"https://api.tcgdex.net/v2/{lang_key}/cards/{urllib.parse.quote(card_exact_id)}"
+                    # Enkoda URL korrekt för japanska tecken/specialtecken
+                    safe_cand_id = urllib.parse.quote(cand_id.lower())
+                    url = f"https://api.tcgdex.net/v2/{l_key}/cards/{safe_cand_id}"
                     res = requests.get(url, headers=headers, timeout=2)
+                    
                     if res.status_code == 200:
                         item = res.json()
                         if isinstance(item, dict) and item.get("id"):
                             c_id = item.get("id")
-                            img_base = item.get("image") or ""
-                            full_set_name, set_code = get_set_details_sync(s_id, lang_key)
-                            
-                            return [{
-                                "id": f"{c_id}_{lang_code}",
-                                "name": item.get("name") or "",
-                                "eng_name": item.get("name") or "",
-                                "set_code": set_code or raw_set.upper(),
-                                "set_name": full_set_name or "",
-                                "number": str(item.get("localId") or num_target),
-                                "image_url": f"{img_base}/high.png" if img_base else "",
-                                "default_lang": lang_code
-                            }]
+                            if c_id not in seen_ids:
+                                seen_ids.add(c_id)
+                                img_base = item.get("image") or ""
+                                raw_set_id = c_id.split("-")[0] if "-" in c_id else set_id
+                                full_set_name, set_code = get_set_details_sync(raw_set_id, l_key)
+
+                                # Bestäm språkkod baserat på vad API:et faktiskt svarade med
+                                detected_lang_code = "JPN" if l_key == "ja" else lang_code
+
+                                results.append({
+                                    "id": f"{c_id}_{detected_lang_code}",
+                                    "name": item.get("name") or "",
+                                    "eng_name": item.get("name") or "",
+                                    "set_code": set_code or set_id.upper(),
+                                    "set_name": full_set_name or set_id.upper(),
+                                    "number": str(item.get("localId") or num),
+                                    "image_url": f"{img_base}/high.png" if img_base else "",
+                                    "default_lang": detected_lang_code
+                                })
+                                return results
                 except Exception:
                     pass
 
-    # METOD B: BRED SÖKNING VIA TCGDEX SÖK-ENDPOINT (Fungerar för alla engelska/japanska namn)
+    # 2. STANDARD NAMNSÖKNING (För fritext som "Pikachu" eller japanska namn i hiragana)
     try:
-        # Om det finns textord, sök i första hand på namnet/ordet
-        search_term = text_words[0] if text_words else clean_query
-        url = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(search_term)}"
-        res = requests.get(url, headers=headers, timeout=3)
+        encoded_query = urllib.parse.quote(clean_query.lower())
+        url_search = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={encoded_query}"
+        res_search = requests.get(url_search, headers=headers, timeout=3)
         
-        if res.status_code == 200:
-            cards_list = res.json()
+        if res_search.status_code == 200:
+            cards_list = res_search.json()
             if isinstance(cards_list, list):
                 for item in cards_list:
                     c_id = str(item.get("id") or "").lower()
                     c_name = str(item.get("name") or "").lower()
-                    c_local_id = str(item.get("localId") or "").lstrip("0")
                     
-                    id_parts = c_id.split("-")
-                    id_number = id_parts[-1].lstrip("0") if len(id_parts) > 1 else ""
-                    card_num = c_local_id if c_local_id else id_number
+                    if c_id not in seen_ids:
+                        seen_ids.add(c_id)
+                        img_base = item.get("image") or ""
+                        raw_set_id = c_id.split("-")[0] if "-" in c_id else ""
+                        full_set_name, set_code = get_set_details_sync(raw_set_id, lang_key)
 
-                    # Matchningsfiltrering
-                    text_match = all(tw in c_name or tw in c_id for tw in text_words) if text_words else True
-                    num_match = (any(num == card_num for num in numbers)) if numbers else True
-
-                    if text_match and num_match:
-                        card_id = str(item.get("id") or "")
-                        unique_key = f"{card_id}_{lang_code}"
-                        
-                        if unique_key not in seen_ids:
-                            seen_ids.add(unique_key)
-                            img_base = item.get("image") or ""
-                            raw_set_id = card_id.split("-")[0] if "-" in card_id else ""
-                            full_set_name, set_code = get_set_details_sync(raw_set_id, lang_key)
-
-                            results.append({
-                                "id": unique_key,
-                                "name": item.get("name") or "",
-                                "eng_name": item.get("name") or "",
-                                "set_code": set_code or "",
-                                "set_name": full_set_name or "",
-                                "number": str(item.get("localId") or (id_parts[-1] if len(id_parts) > 1 else "")),
-                                "image_url": f"{img_base}/high.png" if img_base else "",
-                                "default_lang": lang_code
-                            })
-                            if len(results) >= 25:
-                                break
+                        results.append({
+                            "id": f"{c_id}_{lang_code}",
+                            "name": item.get("name") or "",
+                            "eng_name": item.get("name") or "",
+                            "set_code": set_code or "",
+                            "set_name": full_set_name or "",
+                            "number": str(item.get("localId") or ""),
+                            "image_url": f"{img_base}/high.png" if img_base else "",
+                            "default_lang": lang_code
+                        })
+                        if len(results) >= 20:
+                            break
     except Exception:
         pass
 
