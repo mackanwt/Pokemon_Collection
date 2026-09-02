@@ -171,49 +171,53 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
     results = []
     seen_ids = set()
 
-    # 1. Om man söker Set + Nummer (t.ex. "sm4a 016" eller "sm4a 16")
+    # Mappa om vanliga japanska set-koder till TCGdex internt ID-format
+    SET_ALIAS_MAP = {
+        "sm4a": ["sm4plus", "sm4+"],
+        "sm4b": ["sm4b"],
+        "sm8b": ["sm8b"],
+        "sm12a": ["sm12a"],
+        "s12a": ["s12a"],
+        "sv4a": ["sv4a"]
+    }
+
+    # 1. DIREKT-SÖKNING PÅ SET + NUMMER (t.ex. "sm4a 016" -> testar "sm4plus-016")
     if text_words and numbers:
         raw_set = text_words[0]
         num_target = numbers[0]
         
-        # Inkludera varianter för asiatiska API-strukturer (t.ex. sm4a -> sm4+, sm4plus)
-        possible_sets = [raw_set, raw_set.replace("a", "+"), raw_set.replace("a", "plus")]
+        # Hämta lista på möjliga set-IDn
+        target_sets = SET_ALIAS_MAP.get(raw_set, [raw_set])
         
-        for s_id in possible_sets:
-            try:
-                url_set = f"https://api.tcgdex.net/v2/{lang_key}/sets/{urllib.parse.quote(s_id)}"
-                res_set = requests.get(url_set, headers=headers, timeout=3)
-                if res_set.status_code == 200:
-                    set_data = res_set.json()
-                    cards = set_data.get("cards", [])
-                    for card in cards:
-                        c_id = str(card.get("id") or "")
-                        c_local_id = str(card.get("localId") or "").lstrip("0")
-                        id_number = c_id.split("-")[-1].lstrip("0") if "-" in c_id else ""
-                        card_num = c_local_id if c_local_id else id_number
-                        
-                        if card_num == num_target:
-                            url_card = f"https://api.tcgdex.net/v2/{lang_key}/cards/{urllib.parse.quote(c_id)}"
-                            res_card = requests.get(url_card, headers=headers, timeout=3)
-                            if res_card.status_code == 200:
-                                item = res_card.json()
-                                img_base = item.get("image") or ""
-                                full_set_name, set_code = get_set_details_sync(s_id, lang_key)
-                                
-                                return [{
-                                    "id": f"{c_id}_{lang_code}",
-                                    "name": item.get("name") or "",
-                                    "eng_name": item.get("name") or "",
-                                    "set_code": set_code or "",
-                                    "set_name": full_set_name or "",
-                                    "number": str(item.get("localId") or num_target),
-                                    "image_url": f"{img_base}/high.png" if img_base else "",
-                                    "default_lang": lang_code
-                                }]
-            except Exception:
-                pass
+        for s_id in target_sets:
+            # Sök direkt på exakt kort-ID (format: set-nummer, t.ex. sm4plus-16 eller sm4plus-016)
+            for test_num in [num_target, num_target.zfill(3)]:
+                try:
+                    card_exact_id = f"{s_id}-{test_num}"
+                    url_card = f"https://api.tcgdex.net/v2/{lang_key}/cards/{urllib.parse.quote(card_exact_id)}"
+                    res_card = requests.get(url_card, headers=headers, timeout=2)
+                    
+                    if res_card.status_code == 200:
+                        item = res_card.json()
+                        if isinstance(item, dict) and item.get("id"):
+                            c_id = str(item.get("id"))
+                            img_base = item.get("image") or ""
+                            full_set_name, set_code = get_set_details_sync(s_id, lang_key)
+                            
+                            return [{
+                                "id": f"{c_id}_{lang_code}",
+                                "name": item.get("name") or "",
+                                "eng_name": item.get("name") or "",
+                                "set_code": set_code or raw_set.upper(),
+                                "set_name": full_set_name or "",
+                                "number": str(item.get("localId") or num_target),
+                                "image_url": f"{img_base}/high.png" if img_base else "",
+                                "default_lang": lang_code
+                            }]
+                except Exception:
+                    pass
 
-    # 2. Namnsökning & Generell sökning
+    # 2. GENERELL NAMNSÖKNING (Om inte exakt set+nr matchade)
     search_term = text_words[0] if text_words else words[0]
     try:
         url_search = f"https://api.tcgdex.net/v2/{lang_key}/cards?name={urllib.parse.quote(search_term)}"
@@ -262,7 +266,7 @@ def search_pokemon_cards(query, lang_key="en", lang_code="ENG"):
         pass
 
     return results
-
+    
 # --- INITIERA SESSION STATE ---
 if "editor_version" not in st.session_state:
     st.session_state["editor_version"] = 0
