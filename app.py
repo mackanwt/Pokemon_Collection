@@ -316,6 +316,8 @@ with tab1:
                     
                     raw_img = str(row.get("Bild") or "").strip()
                     if raw_img and not raw_img.startswith("http"):
+                        if not any(raw_img.lower().endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp"]):
+                            raw_img += ".jpg"
                         img_url = f"https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/{raw_img}"
                     else:
                         img_url = raw_img
