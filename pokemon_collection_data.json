@@ -77,28 +77,9 @@
             "Egen Cardmarket L\u00e4nk": "https://www.cardmarket.com/en/Pokemon/Products/Singles/Ultradimensional-Beasts/Alolan-Raichu-sm4a016"
         },
         {
-            "_id": "616d0cc1-fc77-4607-9d39-0832f21ec5a1",
-            "Bild": "https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/togepi043_108.jpg",
-            "P\u00e4rmnummer": 5,
-            "Spr\u00e5k": "JPN",
-            "Namn": "Togepi",
-            "Engelskt Namn": "Togepi",
-            "Setnr.": "043/108",
-            "SetBet.": "SV3",
-            "Set": "Ruler of the Black Flame",
-            "\u00d6vrigt": "Normal",
-            "Skick": "NM",
-            "K\u00f6pt f\u00f6r (EUR)": 0.62,
-            "K\u00f6pt f\u00f6r (SEK)": 6.92,
-            "V\u00e4rde (EUR)": 0.06,
-            "V\u00e4rde idag (SEK)": 0.67,
-            "Google S\u00f6k": "https://www.google.com/search?q=Togepi+043/108+SV3+cardmarket",
-            "Egen Cardmarket L\u00e4nk": "https://www.cardmarket.com/en/Pokemon/Products/Singles/Ruler-of-the-Black-Flame/Togepi-sv3043"
-        },
-        {
             "_id": "bdb04978-a4b6-4275-868e-2ec60ae61dc8",
             "Bild": "https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/Alolan_Raichu30_30.jpg",
-            "P\u00e4rmnummer": 6,
+            "P\u00e4rmnummer": 5,
             "Spr\u00e5k": "ENG",
             "Namn": "Alolan Raichu",
             "Engelskt Namn": "Alolan Raichu",
@@ -113,6 +94,25 @@
             "V\u00e4rde idag (SEK)": 19.2,
             "Google S\u00f6k": "https://www.google.com/search?q=Alolan+Raichu+30/30+Tkit+cardmarket",
             "Egen Cardmarket L\u00e4nk": "https://www.cardmarket.com/en/Pokemon/Products/Singles/SM-Trainer-Kit-Lycanroc-Alolan-Raichu/Alolan-Raichu-V2-TK10A30"
+        },
+        {
+            "_id": "616d0cc1-fc77-4607-9d39-0832f21ec5a1",
+            "Bild": "https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/togepi043_108.jpg",
+            "P\u00e4rmnummer": 6,
+            "Spr\u00e5k": "JPN",
+            "Namn": "Togepi",
+            "Engelskt Namn": "Togepi",
+            "Setnr.": "043/108",
+            "SetBet.": "SV3",
+            "Set": "Ruler of the Black Flame",
+            "\u00d6vrigt": "Normal",
+            "Skick": "NM",
+            "K\u00f6pt f\u00f6r (EUR)": 0.62,
+            "K\u00f6pt f\u00f6r (SEK)": 6.92,
+            "V\u00e4rde (EUR)": 0.06,
+            "V\u00e4rde idag (SEK)": 0.67,
+            "Google S\u00f6k": "https://www.google.com/search?q=Togepi+043/108+SV3+cardmarket",
+            "Egen Cardmarket L\u00e4nk": "https://www.cardmarket.com/en/Pokemon/Products/Singles/Ruler-of-the-Black-Flame/Togepi-sv3043"
         }
     ],
     "custom_names": [
