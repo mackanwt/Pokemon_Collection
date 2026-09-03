@@ -310,6 +310,26 @@ with tab1:
                             active_ids.pop(current_index)
                             active_ids.insert(target_index, cid)
 
+                # Funktion för att hämta ReleaseYear för ett kort i redigeringsläget
+                def get_card_year(cid):
+                    row = edited_map.get(cid, {})
+                    set_bet = str(row.get("SetBet.", "")).strip()
+                    set_name = str(row.get("Set", "")).strip()
+                    for s in sets_db:
+                        if (set_bet and s.get("SetBet") == set_bet) or (set_name and s.get("SetName") == set_name):
+                            return s.get("ReleaseYear", 9999)
+                    return 9999
+
+                # Sortera om aktiva kort så att samma Pokémon-namn sorteras internt efter ReleaseYear,
+                # medan huvudordningen mellan olika Pokémon styrs av den manuella placeringen/pärmnumret.
+                active_ids = sorted(
+                    active_ids, 
+                    key=lambda cid: (
+                        str(edited_map.get(cid, {}).get("Namn", "")).lower(), 
+                        get_card_year(cid)
+                    )
+                )
+
                 def clean_num(val):
                     return str(val).split('/')[0].strip().lstrip('0') if val else ""
 
@@ -368,12 +388,12 @@ with tab1:
 
                 app_data["collection"] = processed_list
                 save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", [])}
-                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling och omordnade pärmnummer")
+                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling och sorterade internt efter år")
                 
                 if success:
                     st.session_state["app_data"] = None 
                     st.session_state["editor_version"] += 1
-                    st.success("Ändringarna sparades och ordningen uppdaterades!")
+                    st.success("Ändringarna sparades och korten sorterades kronologiskt per Pokémon!")
                     st.rerun()
                 else:
                     st.error(f"Kunde inte spara till GitHub: {msg}")
@@ -385,7 +405,7 @@ with tab1:
         c3.metric("Total vinst (SEK)", f"{(df['Värde idag (SEK)'].sum() - df['Köpt för (SEK)'].sum()):,.2f} kr")
     else:
         st.info("Samlingen är tom. Gå till fliken 'Snabb-registrering'.")
-
+        
 # --- FLIK 2: SNABB-REGISTRERING ---
 with tab2:
     st.subheader("⚡ Snabb-registrering")
