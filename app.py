@@ -258,21 +258,46 @@ with tab1:
             )
 
             if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
-                # 1. Säkerställ att Pärmnummer är numeriskt och sortera direkt på dataramen
-                edited_df["Pärmnummer"] = pd.to_numeric(edited_df["Pärmnummer"], errors='coerce').fillna(0).astype(int)
-                edited_df = edited_df.sort_values(by="Pärmnummer", ascending=True).reset_index(drop=True)
-
-                # 2. Omnumrera strikt från 1 och uppåt för att stänga glapp och ordna följden
-                edited_df["Pärmnummer"] = range(1, len(edited_df) + 1)
-
+                current_ids = [item["_id"] for item in collection]
                 raw_edited = edited_df.to_dict(orient="records")
+                edited_map = {row.get("_id"): row for row in raw_edited if row.get("_id")}
                 
+                # Behåll aktiva ID:n (hanterar borttagna rader)
+                active_ids = [cid for cid in current_ids if cid in edited_map]
+                
+                # Lägg till eventuellt nya rader
+                for row in raw_edited:
+                    cid = row.get("_id")
+                    if not cid or cid not in active_ids:
+                        if not cid:
+                            cid = str(uuid.uuid4())
+                            row["_id"] = cid
+                        active_ids.append(cid)
+                        edited_map[cid] = row
+
+                # Positionsflytt: Flytta kort baserat på det nya önskade pärmnumret
+                for row in raw_edited:
+                    cid = row.get("_id")
+                    if cid in active_ids:
+                        try:
+                            target_pnr = int(row.get("Pärmnummer", 1) or 1)
+                        except ValueError:
+                            target_pnr = 1
+                        
+                        current_index = active_ids.index(cid)
+                        target_index = max(0, min(target_pnr - 1, len(active_ids) - 1))
+                        
+                        if current_index != target_index:
+                            active_ids.pop(current_index)
+                            active_ids.insert(target_index, cid)
+
                 def clean_num(val):
                     return str(val).split('/')[0].strip().lstrip('0') if val else ""
 
                 processed_list = []
-                for row in raw_edited:
-                    c_id = row.get("_id") or str(uuid.uuid4())
+                for seq_nr, cid in enumerate(active_ids, start=1):
+                    row = edited_map.get(cid, {})
+                    c_id = cid
                     
                     k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
                     v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
@@ -302,7 +327,7 @@ with tab1:
                     clean_card = {
                         "_id": c_id,
                         "Bild": img_url,
-                        "Pärmnummer": int(row.get("Pärmnummer", 1)),
+                        "Pärmnummer": seq_nr,  # Tvingar fram en strikt, obruten följd utan glapp
                         "Språk": row.get("Språk", "ENG"),
                         "Namn": row.get("Namn", ""),
                         "Engelskt Namn": s_name,
@@ -322,7 +347,7 @@ with tab1:
 
                 app_data["collection"] = processed_list
                 save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", [])}
-                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling och sorterade om pärmnummer")
+                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling och omordnade pärmnummer")
                 
                 if success:
                     st.session_state["app_data"] = None 
