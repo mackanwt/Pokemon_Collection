@@ -21,9 +21,9 @@ SET_FILES = [
 ]
 
 DEFAULT_SETS = [
-    {"SetBet": "BS", "SetName": "Base Set", "Språk": "ENG", "Total": 102},
-    {"SetBet": "MEW", "SetName": "151", "Språk": "ENG", "Total": 165},
-    {"SetBet": "OBF", "SetName": "Obsidian Flames", "Språk": "ENG", "Total": 197}
+    {"SetBet": "BS", "SetName": "Base Set", "Språk": "ENG", "Total": 102, "ReleaseYear": 1999},
+    {"SetBet": "MEW", "SetName": "151", "Språk": "ENG", "Total": 165, "ReleaseYear": 2023},
+    {"SetBet": "OBF", "SetName": "Obsidian Flames", "Språk": "ENG", "Total": 197, "ReleaseYear": 2023}
 ]
 
 # --- SÄKER GITHUB-FUNKTION ---
@@ -141,6 +141,15 @@ if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
             except ValueError:
                 total_cards = 0
 
+            raw_year = item.get("ReleaseYear") or item.get("releaseYear") or item.get("releaseDate") or 0
+            try:
+                if str(raw_year).isdigit():
+                    release_year = int(str(raw_year))
+                else:
+                    release_year = int(str(raw_year)[:4]) if str(raw_year)[:4].isdigit() else 0
+            except ValueError:
+                release_year = 0
+
             unique_key = f"{set_bet}_{lang}"
             if set_bet and unique_key not in seen_keys:
                 seen_keys.add(unique_key)
@@ -157,6 +166,7 @@ if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
                     "SetName": set_name,
                     "Språk": lang,
                     "Total": total_cards,
+                    "ReleaseYear": release_year,
                     "images": img_url
                 }
                 combined_sets.append(normalized_item)
@@ -164,6 +174,8 @@ if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
     if not combined_sets:
         combined_sets = DEFAULT_SETS
 
+    # Sortera kronologiskt efter ReleaseYear (samt fallback på namn)
+    combined_sets = sorted(combined_sets, key=lambda x: (x.get("ReleaseYear", 0) if x.get("ReleaseYear", 0) > 0 else 9999, x.get("SetName", "")))
     st.session_state["sets_data"] = combined_sets
 
 sets_db = st.session_state["sets_data"]
@@ -537,6 +549,18 @@ with tab4:
         if db_lang_filter != "Alla" and "Språk" in sets_df.columns:
             sets_df = sets_df[sets_df["Språk"] == db_lang_filter]
             
-        st.dataframe(sets_df, use_container_width=True, hide_index=True)
+        # Kolumnkonfiguration för att pressa ihop tabellen och visa utgivningsår
+        sets_column_config = {
+            "SetBet": st.column_config.TextColumn("SetBet", width=90),
+            "SetName": st.column_config.TextColumn("SetName", width=250),
+            "Språk": st.column_config.TextColumn("Språk", width=70),
+            "ReleaseYear": st.column_config.NumberColumn("Release Year", width=100, format="%d"),
+            "Total": st.column_config.NumberColumn("Total", width=70)
+        }
+        
+        sets_cols_order = ["SetBet", "SetName", "Språk", "ReleaseYear", "Total"]
+        existing_cols = [c for c in sets_cols_order if c in sets_df.columns]
+
+        st.dataframe(sets_df[existing_cols], column_config=sets_column_config, use_container_width=False, hide_index=True)
     else:
         st.info("Inga set hittades.")
