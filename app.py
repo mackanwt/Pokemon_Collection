@@ -258,6 +258,13 @@ with tab1:
             )
 
             if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
+                # 1. Säkerställ att Pärmnummer är numeriskt och sortera direkt på dataramen
+                edited_df["Pärmnummer"] = pd.to_numeric(edited_df["Pärmnummer"], errors='coerce').fillna(0).astype(int)
+                edited_df = edited_df.sort_values(by="Pärmnummer", ascending=True).reset_index(drop=True)
+
+                # 2. Omnumrera strikt från 1 och uppåt för att stänga glapp och ordna följden
+                edited_df["Pärmnummer"] = range(1, len(edited_df) + 1)
+
                 raw_edited = edited_df.to_dict(orient="records")
                 
                 def clean_num(val):
@@ -295,7 +302,7 @@ with tab1:
                     clean_card = {
                         "_id": c_id,
                         "Bild": img_url,
-                        "Pärmnummer": int(row.get("Pärmnummer", 0) or 0),
+                        "Pärmnummer": int(row.get("Pärmnummer", 1)),
                         "Språk": row.get("Språk", "ENG"),
                         "Namn": row.get("Namn", ""),
                         "Engelskt Namn": s_name,
@@ -312,13 +319,6 @@ with tab1:
                         "Egen Cardmarket Länk": str(row.get("Egen Cardmarket Länk") or "").strip()
                     }
                     processed_list.append(clean_card)
-
-                # Sortera baserat på det nya pärmnumret som användaren angav
-                processed_list.sort(key=lambda x: int(x.get("Pärmnummer", 0)))
-
-                # Omnumrera strikt från 1 och uppåt (tar bort glapp och skiftar följden)
-                for seq_nr, card in enumerate(processed_list, start=1):
-                    card["Pärmnummer"] = seq_nr
 
                 app_data["collection"] = processed_list
                 save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", [])}
