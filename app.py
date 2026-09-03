@@ -275,7 +275,6 @@ with tab1:
                     set_bet = str(row.get("SetBet.") or "").strip()
                     set_name = str(row.get("Set") or "").strip()
                     
-                    # Hantera bildlänken automatiskt mot GitHub-mappen "images"
                     raw_img = str(row.get("Bild") or "").strip()
                     if raw_img and not raw_img.startswith("http"):
                         img_url = f"https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/{raw_img}"
@@ -314,18 +313,21 @@ with tab1:
                     }
                     processed_list.append(clean_card)
 
+                # Sortera baserat på det nya pärmnumret som användaren angav
                 processed_list.sort(key=lambda x: int(x.get("Pärmnummer", 0)))
+
+                # Omnumrera strikt från 1 och uppåt (tar bort glapp och skiftar följden)
                 for seq_nr, card in enumerate(processed_list, start=1):
                     card["Pärmnummer"] = seq_nr
 
                 app_data["collection"] = processed_list
                 save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", [])}
-                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling")
+                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling och sorterade om pärmnummer")
                 
                 if success:
                     st.session_state["app_data"] = None 
                     st.session_state["editor_version"] += 1
-                    st.success("Ändringarna sparades!")
+                    st.success("Ändringarna sparades och ordningen uppdaterades!")
                     st.rerun()
                 else:
                     st.error(f"Kunde inte spara till GitHub: {msg}")
@@ -337,7 +339,7 @@ with tab1:
         c3.metric("Total vinst (SEK)", f"{(df['Värde idag (SEK)'].sum() - df['Köpt för (SEK)'].sum()):,.2f} kr")
     else:
         st.info("Samlingen är tom. Gå till fliken 'Snabb-registrering'.")
-
+        
 # --- FLIK 2: SNABB-REGISTRERING ---
 with tab2:
     st.subheader("⚡ Snabb-registrering")
