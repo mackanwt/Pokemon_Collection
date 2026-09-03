@@ -58,28 +58,9 @@
             "Egen Cardmarket L\u00e4nk": "https://www.cardmarket.com/en/Pokemon/Products/Singles/Unified-Minds/Alolan-Raichu-UNM57"
         },
         {
-            "_id": "144b8a58-d393-4ea6-8795-30839bb2f55a",
-            "Bild": "https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/Alolan_Raichu016_050.jpg",
-            "P\u00e4rmnummer": 4,
-            "Spr\u00e5k": "JPN",
-            "Namn": "Alolan Raichu",
-            "Engelskt Namn": "Alolan Raichu",
-            "Setnr.": "016/050",
-            "SetBet.": "SM4A-JP",
-            "Set": "Ultradimensional Beasts (Crimson Invasion)",
-            "\u00d6vrigt": "Holo",
-            "Skick": "NM",
-            "K\u00f6pt f\u00f6r (EUR)": 3.33,
-            "K\u00f6pt f\u00f6r (SEK)": 37.16,
-            "V\u00e4rde (EUR)": 2.78,
-            "V\u00e4rde idag (SEK)": 31.02,
-            "Google S\u00f6k": "https://www.google.com/search?q=Alolan+Raichu+016/050+SM4A-JP+cardmarket",
-            "Egen Cardmarket L\u00e4nk": "https://www.cardmarket.com/en/Pokemon/Products/Singles/Ultradimensional-Beasts/Alolan-Raichu-sm4a016"
-        },
-        {
             "_id": "bdb04978-a4b6-4275-868e-2ec60ae61dc8",
             "Bild": "https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/Alolan_Raichu30_30.jpg",
-            "P\u00e4rmnummer": 5,
+            "P\u00e4rmnummer": 4,
             "Spr\u00e5k": "ENG",
             "Namn": "Alolan Raichu",
             "Engelskt Namn": "Alolan Raichu",
@@ -98,7 +79,7 @@
         {
             "_id": "cae25b8b-bc26-4ff4-acd5-06821acde3e6",
             "Bild": "https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/Alolan_Raichu30_30.jpg",
-            "P\u00e4rmnummer": 6,
+            "P\u00e4rmnummer": 5,
             "Spr\u00e5k": "ENG",
             "Namn": "Alolan Raichu",
             "Engelskt Namn": "Alolan Raichu",
@@ -117,7 +98,7 @@
         {
             "_id": "2947f2ca-cc7d-42b4-ad66-cad5061ee7a8",
             "Bild": "https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/Alolan_RaichuSM65.jpg",
-            "P\u00e4rmnummer": 7,
+            "P\u00e4rmnummer": 6,
             "Spr\u00e5k": "ENG",
             "Namn": "Alolan Raichu",
             "Engelskt Namn": "Alolan Raichu",
@@ -132,6 +113,25 @@
             "V\u00e4rde idag (SEK)": 0.0,
             "Google S\u00f6k": "https://www.google.com/search?q=Alolan+Raichu+SM65+SM-Promo+cardmarket",
             "Egen Cardmarket L\u00e4nk": "https://www.cardmarket.com/en/Pokemon/Products/Singles/SM-Black-Star-Promos/Alolan-Raichu-V1-SMSM65"
+        },
+        {
+            "_id": "144b8a58-d393-4ea6-8795-30839bb2f55a",
+            "Bild": "https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/Alolan_Raichu016_050.jpg",
+            "P\u00e4rmnummer": 7,
+            "Spr\u00e5k": "JPN",
+            "Namn": "Alolan Raichu",
+            "Engelskt Namn": "Alolan Raichu",
+            "Setnr.": "016/050",
+            "SetBet.": "SM4A-JP",
+            "Set": "Ultradimensional Beasts (Crimson Invasion)",
+            "\u00d6vrigt": "Holo",
+            "Skick": "NM",
+            "K\u00f6pt f\u00f6r (EUR)": 3.33,
+            "K\u00f6pt f\u00f6r (SEK)": 37.16,
+            "V\u00e4rde (EUR)": 2.78,
+            "V\u00e4rde idag (SEK)": 31.02,
+            "Google S\u00f6k": "https://www.google.com/search?q=Alolan+Raichu+016/050+SM4A-JP+cardmarket",
+            "Egen Cardmarket L\u00e4nk": "https://www.cardmarket.com/en/Pokemon/Products/Singles/Ultradimensional-Beasts/Alolan-Raichu-sm4a016"
         },
         {
             "_id": "dbcd8bcb-7fdb-4082-89a4-dd6d2fe76b22",
