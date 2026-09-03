@@ -402,31 +402,48 @@ with tab2:
         else:
             reg_name = st.text_input("Pokémon-namn", placeholder="T.ex. Togepi", key="reg_name_txt")
     with c3:
-        reg_setnr_raw = st.text_input("Setnr.", placeholder="T.ex. 043/108 eller 043", key="reg_setnr")
+        reg_setnr_raw = st.text_input("Setnr.", placeholder="T.ex. 043/108 eller SM65", key="reg_setnr")
 
+    import re
     parts = reg_setnr_raw.split('/')
-    clean_num_str = parts[0].strip().lstrip('0')
-    card_number = int(clean_num_str) if clean_num_str.isdigit() else None
-
+    card_number = None
     set_total_target = None
+    promo_prefix = None
+
     if len(parts) > 1:
+        # Vanligt format: t.ex. 043/108
+        clean_num_str = parts[0].strip().lstrip('0')
+        card_number = int(clean_num_str) if clean_num_str.isdigit() else None
         set_total_str = parts[1].strip().lstrip('0')
         if set_total_str.isdigit():
             set_total_target = int(set_total_str)
+    else:
+        # Promo-format eller fritext: t.ex. SM65 eller 65
+        match = re.match(r"^([A-Za-z\-]+)\s*(\d+)$", reg_setnr_raw.strip())
+        if match:
+            promo_prefix = match.group(1).upper()
+            card_number = int(match.group(2))
+        else:
+            clean_num_str = reg_setnr_raw.strip().lstrip('0')
+            if clean_num_str.isdigit():
+                card_number = int(clean_num_str)
 
     matching_sets = []
-    if card_number is not None:
-        for s_item in sets_db:
-            s_lang = s_item.get("Språk", "ENG")
-            total_cards = s_item.get("Total", 0)
-            
-            if s_lang == reg_language.upper():
-                if set_total_target is not None:
-                    if total_cards == set_total_target:
-                        matching_sets.append(s_item)
-                else:
-                    if total_cards >= card_number:
-                        matching_sets.append(s_item)
+    for s_item in sets_db:
+        s_lang = s_item.get("Språk", "ENG")
+        s_bet = str(s_item.get("SetBet", "")).upper()
+        total_cards = s_item.get("Total", 0)
+        
+        if s_lang == reg_language.upper():
+            if promo_prefix:
+                if promo_prefix in s_bet or s_bet.startswith(promo_prefix):
+                    matching_sets.append(s_item)
+            elif set_total_target is not None:
+                if total_cards == set_total_target and card_number and total_cards >= card_number:
+                    matching_sets.append(s_item)
+            elif card_number is not None:
+                if total_cards >= card_number:
+                    matching_sets.append(s_item)
 
     selected_set = None
     if matching_sets:
@@ -437,7 +454,9 @@ with tab2:
         chosen_label = st.selectbox("Välj matchande Set:", options=list(set_options.keys()), key="reg_matched_set")
         selected_set = set_options[chosen_label]
     elif reg_setnr_raw:
-        if set_total_target is not None:
+        if promo_prefix:
+            st.warning(f"Hittade inga {reg_language}-set som matchar promokoden '{promo_prefix}'.")
+        elif set_total_target is not None:
             st.warning(f"Hittade inga {reg_language}-set med exakt {set_total_target} totala kort.")
         else:
             st.warning(f"Hittade inga {reg_language}-set som har minst {card_number} kort.")
@@ -497,7 +516,7 @@ with tab2:
                 st.rerun()
             else:
                 st.error(f"Kunde inte spara till GitHub: {msg}")
-
+                
 # --- FLIK 3: NAMN-INSTÄLLNINGAR ---
 with tab3:
     st.subheader("⚙️ Hantera sparade Pokémon-namn")
