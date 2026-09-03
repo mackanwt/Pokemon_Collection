@@ -220,10 +220,21 @@ with tab1:
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * eur_to_sek).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * eur_to_sek).round(2)
 
+        # Hjälpfunktion för att hämta ReleaseYear till dataframe-visning
+        def get_year_for_row(row):
+            set_bet = str(row.get("SetBet.", "")).strip()
+            set_name = str(row.get("Set", "")).strip()
+            for s in sets_db:
+                if (set_bet and s.get("SetBet") == set_bet) or (set_name and s.get("SetName") == set_name):
+                    return s.get("ReleaseYear", "")
+            return ""
+
+        df["Utgivningsår"] = df.apply(get_year_for_row, axis=1)
+
         edit_mode = st.checkbox("✏️ Aktivera redigeringsläge (Mata in värden & egna länkar)")
 
         columns_order = [
-            "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", 
+            "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", "Utgivningsår",
             "Övrigt", "Skick", "Köpt för (EUR)", "Värde (EUR)", "Värde idag (SEK)", "Google Sök", "Egen Cardmarket Länk"
         ]
 
@@ -238,6 +249,7 @@ with tab1:
                 "Setnr.": st.column_config.TextColumn("Setnr.", width=70),
                 "SetBet.": st.column_config.TextColumn("SetBet.", width=70),
                 "Set": st.column_config.TextColumn("Set", width=160),
+                "Utgivningsår": st.column_config.TextColumn("År", width=60),
                 "Övrigt": st.column_config.TextColumn("Övrigt", width=80),
                 "Skick": st.column_config.TextColumn("Skick", width=60),
                 "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="€%.2f", width=80),
@@ -258,6 +270,7 @@ with tab1:
                 "Setnr.": st.column_config.TextColumn("Setnr.", width=70),
                 "SetBet.": st.column_config.TextColumn("SetBet.", width=70),
                 "Set": st.column_config.TextColumn("Set/Base", width=160),
+                "Utgivningsår": st.column_config.TextColumn("År", width=60, disabled=True),
                 "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], width=90),
                 "Skick": st.column_config.SelectboxColumn("Skick", options=["NM", "EX", "GD", "LP", "PL", "PO"], width=60),
                 "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width=80),
@@ -388,7 +401,7 @@ with tab1:
 
                 app_data["collection"] = processed_list
                 save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", [])}
-                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling och sorterade internt efter år")
+                success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling med utgivningsår och sortering")
                 
                 if success:
                     st.session_state["app_data"] = None 
