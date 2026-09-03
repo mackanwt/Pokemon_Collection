@@ -30,7 +30,11 @@ DEFAULT_SETS = [
 def github_load_file(file_path: str, default_data: Any) -> Any:
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    response = requests.get(url, headers=headers)
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+    except Exception:
+        return default_data
+        
     if response.status_code == 200:
         try:
             content = base64.b64decode(response.json()['content']).decode('utf-8')
@@ -47,19 +51,25 @@ def github_save_file(file_path: str, content: Any, commit_message: str) -> Tuple
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     
     sha = None
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        sha = response.json()['sha']
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            sha = response.json()['sha']
+    except Exception:
+        pass
         
     encoded_content = base64.b64encode(json.dumps(content, indent=4).encode('utf-8')).decode('utf-8')
     data = {"message": commit_message, "content": encoded_content}
     if sha:
         data["sha"] = sha
         
-    response = requests.put(url, headers=headers, json=data)
-    if response.status_code in [200, 201]:
-        return True, "Sparat"
-    return False, response.text
+    try:
+        response = requests.put(url, headers=headers, json=data, timeout=10)
+        if response.status_code in [200, 201]:
+            return True, "Sparat"
+        return False, response.text
+    except Exception as e:
+        return False, str(e)
 
 # --- VÄXELKURS ---
 @st.cache_data(ttl=3600)
@@ -75,10 +85,10 @@ def fetch_eur_to_sek_rate() -> float:
 
 eur_to_sek = fetch_eur_to_sek_rate()
 
-def generate_google_cardmarket_url(name, setnr, setname):
+def generate_google_cardmarket_url(name, setnr, setbet):
     if not name:
         return ""
-    q = f"{name} {setnr} {setname} site:cardmarket.com".strip()
+    q = f"{name} {setnr} {setbet} cardmarket".strip()
     return f"https://www.google.com/search?q={q.replace(' ', '+')}"
 
 # --- LADDA SAMLING OCH NAMN SEPARAT ---
@@ -262,10 +272,8 @@ with tab1:
                 raw_edited = edited_df.to_dict(orient="records")
                 edited_map = {row.get("_id"): row for row in raw_edited if row.get("_id")}
                 
-                # Behåll aktiva ID:n (hanterar borttagna rader)
                 active_ids = [cid for cid in current_ids if cid in edited_map]
                 
-                # Lägg till eventuellt nya rader
                 for row in raw_edited:
                     cid = row.get("_id")
                     if not cid or cid not in active_ids:
@@ -275,7 +283,6 @@ with tab1:
                         active_ids.append(cid)
                         edited_map[cid] = row
 
-                # Positionsflytt: Flytta kort baserat på det nya önskade pärmnumret
                 for row in raw_edited:
                     cid = row.get("_id")
                     if cid in active_ids:
@@ -327,7 +334,7 @@ with tab1:
                     clean_card = {
                         "_id": c_id,
                         "Bild": img_url,
-                        "Pärmnummer": seq_nr,  # Tvingar fram en strikt, obruten följd utan glapp
+                        "Pärmnummer": seq_nr,
                         "Språk": row.get("Språk", "ENG"),
                         "Namn": row.get("Namn", ""),
                         "Engelskt Namn": s_name,
@@ -340,7 +347,7 @@ with tab1:
                         "Köpt för (SEK)": round(k_eur * eur_to_sek, 2),
                         "Värde (EUR)": v_eur,
                         "Värde idag (SEK)": round(v_eur * eur_to_sek, 2),
-                        "Google Sök": generate_google_cardmarket_url(s_name, set_nr_input, set_name),
+                        "Google Sök": generate_google_cardmarket_url(s_name, set_nr_input, set_bet),
                         "Egen Cardmarket Länk": str(row.get("Egen Cardmarket Länk") or "").strip()
                     }
                     processed_list.append(clean_card)
@@ -364,7 +371,7 @@ with tab1:
         c3.metric("Total vinst (SEK)", f"{(df['Värde idag (SEK)'].sum() - df['Köpt för (SEK)'].sum()):,.2f} kr")
     else:
         st.info("Samlingen är tom. Gå till fliken 'Snabb-registrering'.")
-        
+
 # --- FLIK 2: SNABB-REGISTRERING ---
 with tab2:
     st.subheader("⚡ Snabb-registrering")
@@ -462,7 +469,7 @@ with tab2:
                 "Köpt för (SEK)": round(reg_kopt * eur_to_sek, 2),
                 "Värde (EUR)": reg_varde,
                 "Värde idag (SEK)": round(reg_varde * eur_to_sek, 2),
-                "Google Sök": generate_google_cardmarket_url(reg_name, reg_setnr_raw, set_name),
+                "Google Sök": generate_google_cardmarket_url(reg_name, reg_setnr_raw, set_bet),
                 "Egen Cardmarket Länk": ""
             }
 
