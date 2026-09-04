@@ -477,9 +477,21 @@
         }
     ],
     "custom_names": [
-        "Alolan Raichu",
-        "Ampharos",
-        "Togepi",
-        "Togetic"
+        {
+            "Namn": "Alolan Raichu",
+            "Ordning": 1
+        },
+        {
+            "Namn": "Togepi",
+            "Ordning": 2
+        },
+        {
+            "Namn": "Togetic",
+            "Ordning": 3
+        },
+        {
+            "Namn": "Ampharos",
+            "Ordning": 4
+        }
     ]
 }
