@@ -333,11 +333,27 @@ with tab1:
                             return s.get("ReleaseYear", 9999)
                     return 9999
 
-                # Sortera om aktiva kort så att samma Pokémon-namn sorteras internt efter ReleaseYear,
-                # medan huvudordningen mellan olika Pokémon styrs av den manuella placeringen/pärmnumret.
+                # Skapa en uppslagstabell för namnnumering (anpassad ordning)
+                custom_names_data = app_data.get("custom_names", [])
+                name_order_map = {}
+                for item in custom_names_data:
+                    if isinstance(item, dict):
+                        n_name = str(item.get("Namn", "")).strip().lower()
+                        n_ord = int(item.get("Ordning", 9999) or 9999)
+                        name_order_map[n_name] = n_ord
+                    elif isinstance(item, str):
+                        name_order_map[item.strip().lower()] = 9999
+
+                def get_name_order(cid):
+                    row = edited_map.get(cid, {})
+                    name = str(row.get("Namn", "")).strip().lower()
+                    return name_order_map.get(name, 9999)
+
+                # Sortera aktiva kort efter egen namnordning, sedan alfabetiskt på namn, och sist utgivningsår
                 active_ids = sorted(
                     active_ids, 
                     key=lambda cid: (
+                        get_name_order(cid),
                         str(edited_map.get(cid, {}).get("Namn", "")).lower(), 
                         get_card_year(cid)
                     )
@@ -424,7 +440,12 @@ with tab2:
     st.subheader("⚡ Snabb-registrering")
     st.caption("Välj språk, namn och setnummer för att hämta rätt set automatiskt.")
 
-    saved_names = app_data.get("custom_names", [])
+    raw_saved_names = app_data.get("custom_names", [])
+    if raw_saved_names and isinstance(raw_saved_names[0], dict):
+        sorted_names_list = sorted(raw_saved_names, key=lambda x: (int(x.get("Ordning", 9999) or 9999), str(x.get("Namn", ""))))
+        saved_names = [item["Namn"] for item in sorted_names_list if item.get("Namn")]
+    else:
+        saved_names = raw_saved_names
 
     c1, c2, c3 = st.columns([1, 2, 2])
     with c1:
@@ -444,14 +465,12 @@ with tab2:
     promo_prefix = None
 
     if len(parts) > 1:
-        # Vanligt format: t.ex. 043/108
         clean_num_str = parts[0].strip().lstrip('0')
         card_number = int(clean_num_str) if clean_num_str.isdigit() else None
         set_total_str = parts[1].strip().lstrip('0')
         if set_total_str.isdigit():
             set_total_target = int(set_total_str)
     else:
-        # Promo-format eller fritext: t.ex. SM65 eller 65
         match = re.match(r"^([A-Za-z\-]+)\s*(\d+)$", reg_setnr_raw.strip())
         if match:
             promo_prefix = match.group(1).upper()
@@ -552,39 +571,47 @@ with tab2:
                 
 # --- FLIK 3: NAMN-INSTÄLLNINGAR ---
 with tab3:
-    st.subheader("⚙️ Hantera sparade Pokémon-namn")
-    st.caption("Lägg till eller ta bort namn från listan.")
+    st.subheader("⚙️ Hantera sparade Pokémon-namn och ordning")
+    st.caption("Ändra ordningsnumret för att bestämma i vilken ordning Pokémon ska dyka upp i samlingen.")
 
-    current_names = app_data.get("custom_names", [])
+    current_names_raw = app_data.get("custom_names", [])
     
-    new_custom_name = st.text_input("Lägg till nytt Pokémon-namn", key="new_name_input")
-    if st.button("Lägg till namn", key="add_name_btn"):
-        if new_custom_name and new_custom_name not in current_names:
-            current_names.append(new_custom_name.strip())
-            current_names.sort()
-            app_data["custom_names"] = current_names
-            save_payload = {"collection": app_data.get("collection", []), "custom_names": current_names}
-            success, msg = github_save_file(DATA_FILE_PATH, save_payload, f"Lade till namn: {new_custom_name}")
-            if success:
-                st.session_state["app_data"] = None
-                st.success(f"Namnet '{new_custom_name}' lades till!")
-                st.rerun()
+    formatted_names = []
+    for i, item in enumerate(current_names_raw):
+        if isinstance(item, str):
+            formatted_names.append({"Namn": item, "Ordning": i + 1})
+        elif isinstance(item, dict):
+            formatted_names.append(item)
 
-    st.write("### Sparade namn:")
-    if current_names:
-        for name in list(current_names):
-            col_name, col_btn = st.columns([4, 1])
-            col_name.write(f"- {name}")
-            if col_btn.button("Ta bort", key=f"del_name_{name}"):
-                current_names.remove(name)
-                app_data["custom_names"] = current_names
-                save_payload = {"collection": app_data.get("collection", []), "custom_names": current_names}
-                success, msg = github_save_file(DATA_FILE_PATH, save_payload, f"Tog bort namn: {name}")
-                if success:
-                    st.session_state["app_data"] = None
-                    st.rerun()
-    else:
-        st.info("Inga sparade namn tillagda ännu.")
+    df_names = pd.DataFrame(formatted_names)
+    if df_names.empty:
+        df_names = pd.DataFrame(columns=["Namn", "Ordning"])
+
+    edited_names_df = st.data_editor(
+        df_names,
+        column_config={
+            "Namn": st.column_config.TextColumn("Pokémon-namn", width=250),
+            "Ordning": st.column_config.NumberColumn("Ordning (1, 2, 3...)", width=120, step=1)
+        },
+        num_rows="dynamic",
+        use_container_width=True,
+        key="names_editor_v1"
+    )
+
+    if st.button("💾 Spara namn och ordning", type="primary", key="save_names_btn"):
+        updated_list = edited_names_df.to_dict(orient="records")
+        cleaned_list = [row for row in updated_list if str(row.get("Namn", "")).strip()]
+        
+        app_data["custom_names"] = cleaned_list
+        save_payload = {"collection": app_data.get("collection", []), "custom_names": cleaned_list}
+        success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade ordning för Pokémon-namn")
+        
+        if success:
+            st.session_state["app_data"] = None
+            st.success("Ordningen sparades!")
+            st.rerun()
+        else:
+            st.error(f"Kunde inte spara till GitHub: {msg}")
 
 # --- FLIK 4: SET-DATABAS ---
 with tab4:
@@ -601,7 +628,6 @@ with tab4:
         if db_lang_filter != "Alla" and "Språk" in sets_df.columns:
             sets_df = sets_df[sets_df["Språk"] == db_lang_filter]
             
-        # Kolumnkonfiguration för att pressa ihop tabellen och visa utgivningsår
         sets_column_config = {
             "SetBet": st.column_config.TextColumn("SetBet", width=90),
             "SetName": st.column_config.TextColumn("SetName", width=250),
