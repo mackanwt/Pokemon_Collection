@@ -174,7 +174,6 @@ if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
     if not combined_sets:
         combined_sets = DEFAULT_SETS
 
-    # Sortera kronologiskt efter ReleaseYear (samt fallback på namn)
     combined_sets = sorted(combined_sets, key=lambda x: (x.get("ReleaseYear", 0) if x.get("ReleaseYear", 0) > 0 else 9999, x.get("SetName", "")))
     st.session_state["sets_data"] = combined_sets
 
@@ -220,7 +219,6 @@ with tab1:
         df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * eur_to_sek).round(2)
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * eur_to_sek).round(2)
 
-        # Hjälpfunktion för att hämta ReleaseYear till dataframe-visning
         def get_year_for_row(row):
             set_bet = str(row.get("SetBet.", "")).strip()
             set_name = str(row.get("Set", "")).strip()
@@ -323,7 +321,6 @@ with tab1:
                             active_ids.pop(current_index)
                             active_ids.insert(target_index, cid)
 
-                # Funktion för att hämta ReleaseYear för ett kort i redigeringsläget
                 def get_card_year(cid):
                     row = edited_map.get(cid, {})
                     set_bet = str(row.get("SetBet.", "")).strip()
@@ -333,7 +330,6 @@ with tab1:
                             return s.get("ReleaseYear", 9999)
                     return 9999
 
-                # Skapa en uppslagstabell för namnnumering (anpassad ordning)
                 custom_names_data = app_data.get("custom_names", [])
                 name_order_map = {}
                 for item in custom_names_data:
@@ -349,7 +345,6 @@ with tab1:
                     name = str(row.get("Namn", "")).strip().lower()
                     return name_order_map.get(name, 9999)
 
-                # Sortera aktiva kort efter egen namnordning, sedan alfabetiskt på namn, och sist utgivningsår
                 active_ids = sorted(
                     active_ids, 
                     key=lambda cid: (
@@ -601,6 +596,12 @@ with tab3:
     if st.button("💾 Spara namn och ordning", type="primary", key="save_names_btn"):
         updated_list = edited_names_df.to_dict(orient="records")
         cleaned_list = [row for row in updated_list if str(row.get("Namn", "")).strip()]
+        
+        # Sortera listan direkt efter det angivna ordningsnumret (och på namn som andrasortering)
+        cleaned_list = sorted(
+            cleaned_list,
+            key=lambda x: (int(x.get("Ordning", 9999) or 9999), str(x.get("Namn", "")).lower())
+        )
         
         app_data["custom_names"] = cleaned_list
         save_payload = {"collection": app_data.get("collection", []), "custom_names": cleaned_list}
