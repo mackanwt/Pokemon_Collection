@@ -567,7 +567,7 @@ with tab2:
 # --- FLIK 3: NAMN-INSTÄLLNINGAR ---
 with tab3:
     st.subheader("⚙️ Hantera sparade Pokémon-namn och ordning")
-    st.caption("Ändra ordningsnumret för att bestämma i vilken ordning Pokémon ska dyka upp i samlingen.")
+    st.caption("Lägg till nya namn, radera befintliga eller ändra ordningsnumret för att styra sorteringen i samlingen.")
 
     current_names_raw = app_data.get("custom_names", [])
     
@@ -605,11 +605,11 @@ with tab3:
         
         app_data["custom_names"] = cleaned_list
         save_payload = {"collection": app_data.get("collection", []), "custom_names": cleaned_list}
-        success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade ordning för Pokémon-namn")
+        success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade ordning och parametrar för Pokémon-namn")
         
         if success:
             st.session_state["app_data"] = None
-            st.success("Ordningen sparades!")
+            st.success("Ändringarna sparades!")
             st.rerun()
         else:
             st.error(f"Kunde inte spara till GitHub: {msg}")
