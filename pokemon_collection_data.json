@@ -672,5 +672,12 @@
             "Namn": "Pachirisu",
             "Ordning": 6
         }
+    ],
+    "custom_ovrigt": [
+        "Normal",
+        "Holo",
+        "Reverse Holo",
+        "1st ed",
+        "Promo"
     ]
 }
