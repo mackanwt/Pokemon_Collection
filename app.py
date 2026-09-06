@@ -26,6 +26,8 @@ DEFAULT_SETS = [
     {"SetBet": "OBF", "SetName": "Obsidian Flames", "Språk": "ENG", "Total": 197, "ReleaseYear": 2023}
 ]
 
+DEFAULT_OVRIGT_VAL = ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"]
+
 # --- SÄKER GITHUB-FUNKTION ---
 def github_load_file(file_path: str, default_data: Any) -> Any:
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
@@ -91,17 +93,24 @@ def generate_google_cardmarket_url(name, setnr, setbet):
     q = f"{name} {setnr} {setbet} cardmarket".strip()
     return f"https://www.google.com/search?q={q.replace(' ', '+')}"
 
-# --- LADDA SAMLING OCH NAMN SEPARAT ---
+# --- LADDA SAMLING OCH INSTÄLLNINGAR SEPARAT ---
 if "app_data" not in st.session_state or st.session_state["app_data"] is None:
-    loaded_data = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": []})
+    loaded_data = github_load_file(DATA_FILE_PATH, {"collection": [], "custom_names": [], "custom_ovrigt": []})
     if not isinstance(loaded_data, dict) or "collection" not in loaded_data:
-        loaded_data = {"collection": [], "custom_names": []}
+        loaded_data = {"collection": [], "custom_names": [], "custom_ovrigt": []}
     st.session_state["app_data"] = loaded_data
 
 app_data = st.session_state["app_data"]
 
 if "editor_version" not in st.session_state:
     st.session_state["editor_version"] = 1
+
+# Hämta eller sätt standardvärden för "Övrigt"
+saved_ovrigt_raw = app_data.get("custom_ovrigt", [])
+if not saved_ovrigt_raw:
+    active_ovrigt_options = DEFAULT_OVRIGT_VAL
+else:
+    active_ovrigt_options = [str(item).strip() for item in saved_ovrigt_raw if str(item).strip()]
 
 # --- LADDA SET-FILER ---
 if "sets_data" not in st.session_state or st.session_state["sets_data"] is None:
@@ -269,7 +278,7 @@ with tab1:
                 "SetBet.": st.column_config.TextColumn("SetBet.", width=70),
                 "Set": st.column_config.TextColumn("Set/Base", width=160),
                 "Utgivningsår": st.column_config.TextColumn("År", width=60, disabled=True),
-                "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], width=90),
+                "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=active_ovrigt_options, width=90),
                 "Skick": st.column_config.SelectboxColumn("Skick", options=["NM", "EX", "GD", "LP", "PL", "PO"], width=60),
                 "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width=80),
                 "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width=80),
@@ -411,7 +420,11 @@ with tab1:
                     processed_list.append(clean_card)
 
                 app_data["collection"] = processed_list
-                save_payload = {"collection": processed_list, "custom_names": app_data.get("custom_names", [])}
+                save_payload = {
+                    "collection": processed_list, 
+                    "custom_names": app_data.get("custom_names", []),
+                    "custom_ovrigt": app_data.get("custom_ovrigt", [])
+                }
                 success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade samling med utgivningsår och sortering")
                 
                 if success:
@@ -510,7 +523,7 @@ with tab2:
 
     c4, c5, c6, c7 = st.columns(4)
     with c4:
-        reg_ovrigt = st.selectbox("Övrigt", ["Normal", "Holo", "Reverse Holo", "Secret Rare", "Promo"], key="reg_ovrigt")
+        reg_ovrigt = st.selectbox("Övrigt", active_ovrigt_options, key="reg_ovrigt")
     with c5:
         reg_skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"], key="reg_skick")
     with c6:
@@ -554,7 +567,11 @@ with tab2:
             }
 
             collection.append(new_card)
-            save_payload = {"collection": collection, "custom_names": app_data.get("custom_names", [])}
+            save_payload = {
+                "collection": collection, 
+                "custom_names": app_data.get("custom_names", []),
+                "custom_ovrigt": app_data.get("custom_ovrigt", [])
+            }
             success, msg = github_save_file(DATA_FILE_PATH, save_payload, f"Lade till kort: {reg_name}")
 
             if success:
@@ -564,7 +581,7 @@ with tab2:
             else:
                 st.error(f"Kunde inte spara till GitHub: {msg}")
                 
-# --- FLIK 3: NAMN-INSTÄLLNINGAR ---
+# --- FLIK 3: NAMN- OCH PARAMETERINSTÄLLNINGAR ---
 with tab3:
     st.subheader("⚙️ Hantera sparade Pokémon-namn och ordning")
     st.caption("Lägg till nya namn, radera befintliga eller ändra ordningsnumret för att styra sorteringen i samlingen.")
@@ -593,23 +610,54 @@ with tab3:
         key="names_editor_v1"
     )
 
-    if st.button("💾 Spara namn och ordning", type="primary", key="save_names_btn"):
+    st.divider()
+
+    st.subheader("⚙️ Hantera val för 'Övrigt'")
+    st.caption("Lägg till, ändra eller radera de alternativ som visas i rullistan för 'Övrigt'.")
+
+    current_ovrigt_list = [{"Alternativ": opt} for opt in active_ovrigt_options]
+    df_ovrigt = pd.DataFrame(current_ovrigt_list)
+    if df_ovrigt.empty:
+        df_ovrigt = pd.DataFrame(columns=["Alternativ"])
+
+    edited_ovrigt_df = st.data_editor(
+        df_ovrigt,
+        column_config={
+            "Alternativ": st.column_config.TextColumn("Övrigt-alternativ", width=300)
+        },
+        num_rows="dynamic",
+        use_container_width=True,
+        key="ovrigt_editor_v1"
+    )
+
+    if st.button("💾 Spara alla inställningar (Namn & Övrigt)", type="primary", key="save_names_btn"):
+        # Bearbeta namn
         updated_list = edited_names_df.to_dict(orient="records")
         cleaned_list = [row for row in updated_list if str(row.get("Namn", "")).strip()]
-        
-        # Sortera listan direkt efter det angivna ordningsnumret (och på namn som andrasortering)
         cleaned_list = sorted(
             cleaned_list,
             key=lambda x: (int(x.get("Ordning", 9999) or 9999), str(x.get("Namn", "")).lower())
         )
         
+        # Bearbeta övrigt-alternativ
+        updated_ovrigt_rows = edited_ovrigt_df.to_dict(orient="records")
+        cleaned_ovrigt = [str(row.get("Alternativ", "")).strip() for row in updated_ovrigt_rows if str(row.get("Alternativ", "")).strip()]
+        if not cleaned_ovrigt:
+            cleaned_ovrigt = DEFAULT_OVRIGT_VAL
+
         app_data["custom_names"] = cleaned_list
-        save_payload = {"collection": app_data.get("collection", []), "custom_names": cleaned_list}
-        success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade ordning och parametrar för Pokémon-namn")
+        app_data["custom_ovrigt"] = cleaned_ovrigt
+
+        save_payload = {
+            "collection": app_data.get("collection", []), 
+            "custom_names": cleaned_list,
+            "custom_ovrigt": cleaned_ovrigt
+        }
+        success, msg = github_save_file(DATA_FILE_PATH, save_payload, "Uppdaterade namn och Övrigt-parametrar")
         
         if success:
             st.session_state["app_data"] = None
-            st.success("Ändringarna sparades!")
+            st.success("Alla inställningar sparades!")
             st.rerun()
         else:
             st.error(f"Kunde inte spara till GitHub: {msg}")
