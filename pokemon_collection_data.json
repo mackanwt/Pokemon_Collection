@@ -732,6 +732,10 @@
         {
             "Namn": "Dragalge",
             "Ordning": 7
+        },
+        {
+            "Namn": "Goodra",
+            "Ordning": 8
         }
     ],
     "custom_ovrigt": [
