@@ -499,11 +499,12 @@ with tab2:
                 if promo_prefix in s_bet or s_bet.startswith(promo_prefix):
                     matching_sets.append(s_item)
             elif set_total_target is not None:
-                if total_cards == set_total_target and card_number and total_cards >= card_number:
+                # Matchar om setets total stämmer överens, oavsett hur högt kortnumret är (t.ex. 1303/07)
+                if total_cards == set_total_target:
                     matching_sets.append(s_item)
             elif card_number is not None:
-                if total_cards >= card_number:
-                    matching_sets.append(s_item)
+                # Om inget totalantal (snedstreck) angivits, visa tillgängliga set i språket
+                matching_sets.append(s_item)
 
     selected_set = None
     if matching_sets:
@@ -519,7 +520,7 @@ with tab2:
         elif set_total_target is not None:
             st.warning(f"Hittade inga {reg_language}-set med exakt {set_total_target} totala kort.")
         else:
-            st.warning(f"Hittade inga {reg_language}-set som har minst {card_number} kort.")
+            st.warning(f"Hittade inga {reg_language}-set för språket {reg_language}.")
 
     c4, c5, c6, c7 = st.columns(4)
     with c4:
