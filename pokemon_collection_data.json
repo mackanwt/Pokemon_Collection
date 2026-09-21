@@ -990,7 +990,7 @@
         },
         {
             "_id": "2e0098f5-f614-4795-bd46-ce009c47fd9b",
-            "Bild": "",
+            "Bild": "https://raw.githubusercontent.com/mackanwt/Pokemon_Collection/main/images/Mimikyu1303_07.jpg",
             "P\u00e4rmnummer": 53,
             "Spr\u00e5k": "ZHT",
             "Namn": "Mimikyu",
@@ -1002,10 +1002,10 @@
             "Skick": "NM",
             "K\u00f6pt f\u00f6r (EUR)": 1.55,
             "K\u00f6pt f\u00f6r (SEK)": 17.5,
-            "V\u00e4rde (EUR)": 0.0,
-            "V\u00e4rde idag (SEK)": 0.0,
+            "V\u00e4rde (EUR)": 0.13,
+            "V\u00e4rde idag (SEK)": 1.47,
             "Google S\u00f6k": "https://www.google.com/search?q=Mimikyu+1303/07+CCB3+cardmarket",
-            "Egen Cardmarket L\u00e4nk": ""
+            "Egen Cardmarket L\u00e4nk": "https://www.cardmarket.com/en/Pokemon/Products/Singles/Gem-Pack-Vol-3/Mimikyu-V3-CBB3C13?language=1&minCondition=2&isReverseHolo=N"
         }
     ],
     "custom_names": [
