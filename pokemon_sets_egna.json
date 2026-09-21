@@ -61,5 +61,19 @@
     "Language": "ENG",
     "TotalCards": "30",
     "ReleaseYear": 2022
+  },
+    {
+    "SetBet": "Sl",
+    "SetName": "Startdeck 100",
+    "Language": "JPN",
+    "TotalCards": "414",
+    "ReleaseYear": 2021
+  },
+    {
+    "SetBet": "SMD",
+    "SetName": "Ash vs Team Rocket Deck Kit",
+    "Language": "JPN",
+    "TotalCards": "026",
+    "ReleaseYear": 2017
   }
 ]
