@@ -1242,6 +1242,10 @@
         {
             "Namn": "Zeraora",
             "Ordning": 11
+        },
+        {
+            "Namn": "Dragapult",
+            "Ordning": 12
         }
     ],
     "custom_ovrigt": [
