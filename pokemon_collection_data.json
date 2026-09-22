@@ -1048,6 +1048,10 @@
         {
             "Namn": "Mimikyu",
             "Ordning": 10
+        },
+        {
+            "Namn": "Zeraora",
+            "Ordning": 11
         }
     ],
     "custom_ovrigt": [
