@@ -1322,6 +1322,10 @@
         {
             "Namn": "Dragapult",
             "Ordning": 12
+        },
+        {
+            "Namn": "Gholdengo",
+            "Ordning": 13
         }
     ],
     "custom_ovrigt": [
