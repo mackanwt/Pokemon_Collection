@@ -1548,12 +1548,16 @@
             "Ordning": 11
         },
         {
-            "Namn": "Dragapult",
+            "Namn": "Toxtricity",
             "Ordning": 12
         },
         {
-            "Namn": "Gholdengo",
+            "Namn": "Dragapult",
             "Ordning": 13
+        },
+        {
+            "Namn": "Gholdengo",
+            "Ordning": 14
         }
     ],
     "custom_ovrigt": [
