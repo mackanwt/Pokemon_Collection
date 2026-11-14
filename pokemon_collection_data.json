@@ -1913,12 +1913,20 @@
             "Ordning": 12
         },
         {
-            "Namn": "Dragapult",
+            "Namn": "Grimmsnarl",
             "Ordning": 13
         },
         {
-            "Namn": "Gholdengo",
+            "Namn": "Dragapult",
             "Ordning": 14
+        },
+        {
+            "Namn": "Zarude",
+            "Ordning": 15
+        },
+        {
+            "Namn": "Gholdengo",
+            "Ordning": 16
         }
     ],
     "custom_ovrigt": [
