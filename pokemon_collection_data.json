@@ -2248,8 +2248,16 @@
             "Ordning": 15
         },
         {
-            "Namn": "Gholdengo",
+            "Namn": "Annihilape",
             "Ordning": 16
+        },
+        {
+            "Namn": "Primape",
+            "Ordning": 17
+        },
+        {
+            "Namn": "Gholdengo",
+            "Ordning": 18
         }
     ],
     "custom_ovrigt": [
