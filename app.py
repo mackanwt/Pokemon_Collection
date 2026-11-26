@@ -4,6 +4,7 @@ import json
 import requests
 import base64
 import uuid
+import re
 from typing import List, Dict, Any, Tuple
 
 # --- KONFIGURATION ---
@@ -216,16 +217,25 @@ with tab1:
         if "Värde (USD)" in df.columns and "Värde (EUR)" not in df.columns:
             df["Värde (EUR)"] = df["Värde (USD)"]
         
-        for col in ["Bild", "Pärmnummer", "Värde (EUR)", "Köpt för (EUR)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn", "_id"]:
+        for col in ["Bild", "Pärmnummer", "Värde (EUR)", "Köpt för (EUR)", "Köpt för (SEK)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn", "_id"]:
             if col not in df.columns:
-                df[col] = 0.0 if "Värde" in col or "Köpt" in col else ""
+                df[col] = None if col == "Köpt för (SEK)" else (0.0 if "Värde" in col or "Köpt" in col else "")
         
         df["Bild"] = df["Bild"].fillna("").astype(str)
         df["Värde (EUR)"] = pd.to_numeric(df["Värde (EUR)"], errors='coerce').fillna(0.0)
         df["Köpt för (EUR)"] = pd.to_numeric(df["Köpt för (EUR)"], errors='coerce').fillna(0.0)
         df["Egen Cardmarket Länk"] = df["Egen Cardmarket Länk"].fillna("").astype(str)
         
-        df["Köpt för (SEK)"] = (df["Köpt för (EUR)"] * eur_to_sek).round(2)
+        # Bevara det låsta Köpt för (SEK) om det finns sparat; beräkna endast om det saknas helt
+        def resolve_locked_kopt_sek(row):
+            val = pd.to_numeric(row.get("Köpt för (SEK)"), errors='coerce')
+            k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
+            if pd.isna(val) or (val == 0.0 and k_eur > 0.0):
+                return round(k_eur * eur_to_sek, 2)
+            return round(float(val), 2)
+
+        df["Köpt för (SEK)"] = df.apply(resolve_locked_kopt_sek, axis=1)
+        # Värde idag (SEK) uppdateras alltid mot aktuell växelkurs
         df["Värde idag (SEK)"] = (df["Värde (EUR)"] * eur_to_sek).round(2)
 
         def get_year_for_row(row):
@@ -238,11 +248,23 @@ with tab1:
 
         df["Utgivningsår"] = df.apply(get_year_for_row, axis=1)
 
-        edit_mode = st.checkbox("✏️ Aktivera redigeringsläge (Mata in värden & egna länkar)")
+        # Summeringar som visas ovanför respektive kolumn
+        tot_kopt_eur = df["Köpt för (EUR)"].sum()
+        tot_kopt_sek = df["Köpt för (SEK)"].sum()
+        tot_varde_eur = df["Värde (EUR)"].sum()
+        tot_varde_sek = df["Värde idag (SEK)"].sum()
+
+        col_ctrl, col_sum_kopt, col_sum_varde, col_pad = st.columns([4.2, 2.2, 2.2, 1.4])
+        with col_ctrl:
+            edit_mode = st.checkbox("✏️ Aktivera redigeringsläge (Mata in värden & egna länkar)")
+        with col_sum_kopt:
+            st.caption(f"**Totalt Köpt:** €{tot_kopt_eur:,.2f}  |  **{tot_kopt_sek:,.2f} kr**")
+        with col_sum_varde:
+            st.caption(f"**Totalt Värde:** €{tot_varde_eur:,.2f}  |  **{tot_varde_sek:,.2f} kr**")
 
         columns_order = [
             "Bild", "Pärmnummer", "Språk", "Namn", "Setnr.", "SetBet.", "Set", "Utgivningsår",
-            "Övrigt", "Skick", "Köpt för (EUR)", "Värde (EUR)", "Värde idag (SEK)", "Google Sök", "Egen Cardmarket Länk"
+            "Övrigt", "Skick", "Köpt för (EUR)", "Köpt för (SEK)", "Värde (EUR)", "Värde idag (SEK)", "Google Sök", "Egen Cardmarket Länk"
         ]
 
         if not edit_mode:
@@ -260,6 +282,7 @@ with tab1:
                 "Övrigt": st.column_config.TextColumn("Övrigt", width=80),
                 "Skick": st.column_config.TextColumn("Skick", width=60),
                 "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="€%.2f", width=80),
+                "Köpt för (SEK)": st.column_config.NumberColumn("Köpt (SEK)", format="%.2f kr", width=90),
                 "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="€%.2f", width=80),
                 "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width=90),
                 "Google Sök": st.column_config.LinkColumn("Sök Cardmarket", display_text="🔍 Sök", width=100),
@@ -281,6 +304,7 @@ with tab1:
                 "Övrigt": st.column_config.SelectboxColumn("Övrigt", options=active_ovrigt_options, width=90),
                 "Skick": st.column_config.SelectboxColumn("Skick", options=["NM", "EX", "GD", "LP", "PL", "PO"], width=60),
                 "Köpt för (EUR)": st.column_config.NumberColumn("Köpt (EUR)", format="%.2f", width=80),
+                "Köpt för (SEK)": st.column_config.NumberColumn("Köpt (SEK)", format="%.2f", width=90),
                 "Värde (EUR)": st.column_config.NumberColumn("Värde (EUR)", format="%.2f", width=80),
                 "Värde idag (SEK)": st.column_config.NumberColumn("Värde (SEK)", format="%.2f kr", width=90, disabled=True),
                 "Google Sök": st.column_config.TextColumn("Google Sök URL", disabled=True, width=100),
@@ -301,6 +325,7 @@ with tab1:
 
             if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
                 current_ids = [item["_id"] for item in collection]
+                orig_df_map = df.set_index("_id").to_dict(orient="index")
                 raw_edited = edited_df.to_dict(orient="records")
                 edited_map = {row.get("_id"): row for row in raw_edited if row.get("_id")}
                 
@@ -369,9 +394,35 @@ with tab1:
                 processed_list = []
                 for seq_nr, cid in enumerate(active_ids, start=1):
                     row = edited_map.get(cid, {})
+                    orig_row = orig_df_map.get(cid, {})
                     c_id = cid
                     
-                    k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
+                    new_k_eur = float(row.get("Köpt för (EUR)", 0.0) or 0.0)
+                    new_k_sek = float(row.get("Köpt för (SEK)", 0.0) or 0.0)
+                    old_k_eur = float(orig_row.get("Köpt för (EUR)", 0.0) or 0.0)
+                    old_k_sek = float(orig_row.get("Köpt för (SEK)", 0.0) or 0.0)
+
+                    # Synka EUR <-> SEK om endera har redigerats, annars behåll låst SEK-kurs
+                    if cid not in orig_df_map:
+                        if new_k_sek != 0.0 and new_k_eur == 0.0:
+                            k_sek = round(new_k_sek, 2)
+                            k_eur = round(k_sek / eur_to_sek, 2) if eur_to_sek else 0.0
+                        else:
+                            k_eur = round(new_k_eur, 2)
+                            k_sek = round(k_eur * eur_to_sek, 2)
+                    else:
+                        eur_changed = abs(new_k_eur - old_k_eur) > 1e-4
+                        sek_changed = abs(new_k_sek - old_k_sek) > 1e-4
+                        if sek_changed and not eur_changed:
+                            k_sek = round(new_k_sek, 2)
+                            k_eur = round(k_sek / eur_to_sek, 2) if eur_to_sek else 0.0
+                        elif eur_changed:
+                            k_eur = round(new_k_eur, 2)
+                            k_sek = round(k_eur * eur_to_sek, 2)
+                        else:
+                            k_eur = round(old_k_eur, 2)
+                            k_sek = round(old_k_sek, 2)
+
                     v_eur = float(row.get("Värde (EUR)", 0.0) or 0.0)
                     s_name = row.get("Engelskt Namn") or row.get("Namn") or ""
                     
@@ -411,7 +462,7 @@ with tab1:
                         "Övrigt": row.get("Övrigt", "Normal"),
                         "Skick": row.get("Skick", "NM"),
                         "Köpt för (EUR)": k_eur,
-                        "Köpt för (SEK)": round(k_eur * eur_to_sek, 2),
+                        "Köpt för (SEK)": k_sek,
                         "Värde (EUR)": v_eur,
                         "Värde idag (SEK)": round(v_eur * eur_to_sek, 2),
                         "Google Sök": generate_google_cardmarket_url(s_name, set_nr_input, set_bet),
@@ -436,10 +487,9 @@ with tab1:
                     st.error(f"Kunde inte spara till GitHub: {msg}")
 
         st.divider()
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         c1.metric("Totalt antal kort", len(df))
-        c2.metric("Totalt värde (SEK)", f"{df['Värde idag (SEK)'].sum():,.2f} kr")
-        c3.metric("Total vinst (SEK)", f"{(df['Värde idag (SEK)'].sum() - df['Köpt för (SEK)'].sum()):,.2f} kr")
+        c2.metric("Total vinst (SEK)", f"{(tot_varde_sek - tot_kopt_sek):,.2f} kr")
     else:
         st.info("Samlingen är tom. Gå till fliken 'Snabb-registrering'.")
         
@@ -466,7 +516,6 @@ with tab2:
     with c3:
         reg_setnr_raw = st.text_input("Setnr.", placeholder="T.ex. 043/108 eller SM65", key="reg_setnr")
 
-    import re
     parts = reg_setnr_raw.split('/')
     card_number = None
     set_total_target = None
@@ -499,11 +548,9 @@ with tab2:
                 if promo_prefix in s_bet or s_bet.startswith(promo_prefix):
                     matching_sets.append(s_item)
             elif set_total_target is not None:
-                # Matchar om setets total stämmer överens, oavsett hur högt kortnumret är (t.ex. 1303/07)
                 if total_cards == set_total_target:
                     matching_sets.append(s_item)
             elif card_number is not None:
-                # Om inget totalantal (snedstreck) angivits, visa tillgängliga set i språket
                 matching_sets.append(s_item)
 
     selected_set = None
@@ -522,15 +569,36 @@ with tab2:
         else:
             st.warning(f"Hittade inga {reg_language}-set för språket {reg_language}.")
 
-    c4, c5, c6, c7 = st.columns(4)
+    # Initiera och synka valutor (EUR <-> SEK) i snabb-registreringen
+    for k in ["reg_kopt_eur", "reg_kopt_sek", "reg_varde_eur", "reg_varde_sek"]:
+        if k not in st.session_state:
+            st.session_state[k] = 0.0
+
+    def sync_kopt_from_eur():
+        st.session_state["reg_kopt_sek"] = round(st.session_state["reg_kopt_eur"] * eur_to_sek, 2)
+
+    def sync_kopt_from_sek():
+        st.session_state["reg_kopt_eur"] = round(st.session_state["reg_kopt_sek"] / eur_to_sek, 2) if eur_to_sek else 0.0
+
+    def sync_varde_from_eur():
+        st.session_state["reg_varde_sek"] = round(st.session_state["reg_varde_eur"] * eur_to_sek, 2)
+
+    def sync_varde_from_sek():
+        st.session_state["reg_varde_eur"] = round(st.session_state["reg_varde_sek"] / eur_to_sek, 2) if eur_to_sek else 0.0
+
+    c4, c5, c6, c7, c8, c9 = st.columns([1.2, 1, 1.2, 1.2, 1.2, 1.2])
     with c4:
         reg_ovrigt = st.selectbox("Övrigt", active_ovrigt_options, key="reg_ovrigt")
     with c5:
         reg_skick = st.selectbox("Skick", ["NM", "EX", "GD", "LP", "PL", "PO"], key="reg_skick")
     with c6:
-        reg_kopt = st.number_input("Köpt för (EUR)", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="reg_kopt")
+        reg_kopt_eur = st.number_input("Köpt för (EUR)", min_value=0.0, step=0.5, format="%.2f", key="reg_kopt_eur", on_change=sync_kopt_from_eur)
     with c7:
-        reg_varde = st.number_input("Värde (EUR)", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="reg_varde")
+        reg_kopt_sek = st.number_input("Köpt för (SEK)", min_value=0.0, step=5.0, format="%.2f", key="reg_kopt_sek", on_change=sync_kopt_from_sek)
+    with c8:
+        reg_varde_eur = st.number_input("Värde (EUR)", min_value=0.0, step=0.5, format="%.2f", key="reg_varde_eur", on_change=sync_varde_from_eur)
+    with c9:
+        reg_varde_sek = st.number_input("Värde (SEK)", min_value=0.0, step=5.0, format="%.2f", key="reg_varde_sek", on_change=sync_varde_from_sek)
 
     if st.button("➕ Registrera kort i samlingen", type="primary", use_container_width=True, key="reg_btn"):
         if not reg_name:
@@ -559,10 +627,10 @@ with tab2:
                 "Set": set_name,
                 "Övrigt": reg_ovrigt,
                 "Skick": reg_skick,
-                "Köpt för (EUR)": reg_kopt,
-                "Köpt för (SEK)": round(reg_kopt * eur_to_sek, 2),
-                "Värde (EUR)": reg_varde,
-                "Värde idag (SEK)": round(reg_varde * eur_to_sek, 2),
+                "Köpt för (EUR)": round(reg_kopt_eur, 2),
+                "Köpt för (SEK)": round(reg_kopt_sek, 2),
+                "Värde (EUR)": round(reg_varde_eur, 2),
+                "Värde idag (SEK)": round(reg_varde_eur * eur_to_sek, 2),
                 "Google Sök": generate_google_cardmarket_url(reg_name, reg_setnr_raw, set_bet),
                 "Egen Cardmarket Länk": ""
             }
