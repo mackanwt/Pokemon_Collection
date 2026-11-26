@@ -153,6 +153,62 @@
     "TotalCards": "098",
     "ReleaseYear": 2025
   },
+  {
+    "SetBet": "SVP",
+    "SetName": "SV Black Star Promo",
+    "Language": "ENG",
+    "TotalCards": "304",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "CBB3C",
+    "SetName": "Gem Pack Vol. 3",
+    "Language": "ZHT",
+    "TotalCards": "07",
+    "ReleaseYear": 2025
+  },
+  {
+    "SetBet": "M2",
+    "SetName": "Inferno X",
+    "Language": "JPN",
+    "TotalCards": "080",
+    "ReleaseYear": 2023
+  },
+  {
+    "SetBet": "OBF",
+    "SetName": "Obsidian Flames",
+    "Language": "ENG",
+    "TotalCards": "197",
+    "ReleaseYear": 2025
+  },
+   {
+    "SetBet": "POR",
+    "SetName": "Perfect Order",
+    "Language": "ENG",
+    "TotalCards": "088",
+    "ReleaseYear": 2026
+  },
+  {
+    "SetBet": "PRE",
+    "SetName": "Prismatic Evolutions",
+    "Language": "ENG",
+    "TotalCards": "131",
+    "ReleaseYear": 2025
+  },
+  {
+    "SetBet": "TG",
+    "SetName": "Silver Tempest",
+    "Language": "ENG",
+    "TotalCards": "TG30",
+    "ReleaseYear": 2022
+  },
+  {
+    "SetBet": "GG",
+    "SetName": "Crown Zenith",
+    "Language": "ENG",
+    "TotalCards": "GG70",
+    "ReleaseYear": 2023
+  },
     {
     "SetBet": "30C",
     "SetName": "30th Celebration",
