@@ -194,6 +194,62 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Samling", "⚡ Snabb-registrering", "⚙
 
 # --- FLIK 1: SAMLING ---
 with tab1:
+    collection = sorted(app_data.get("collection", []), key=lambda x: int(x.get("Pärmnummer", 0) or 0))
+    app_data["collection"] = collection
+
+    # --- SNABBFILTRERING PÅ NAMN (OVANFÖR "MIN SAMLING") ---
+    raw_names_for_filter = app_data.get("custom_names", [])
+    if raw_names_for_filter and isinstance(raw_names_for_filter[0], dict):
+        sorted_filter_list = sorted(raw_names_for_filter, key=lambda x: (int(x.get("Ordning", 9999) or 9999), str(x.get("Namn", ""))))
+        filter_names = [str(item["Namn"]).strip() for item in sorted_filter_list if str(item.get("Namn", "")).strip()]
+    else:
+        filter_names = [str(n).strip() for n in raw_names_for_filter if str(n).strip()]
+
+    # Kontrollera om det finns kort med namn som inte ligger i Namn-inställningar
+    known_lower = {n.lower() for n in filter_names}
+    has_other_names = any(str(c.get("Namn", "")).strip().lower() not in known_lower for c in collection)
+
+    selected_filter_names = set()
+    include_other_names = True
+
+    if filter_names:
+        f_top_title, f_top_btn1, f_top_btn2, f_top_pad = st.columns([2.2, 1.3, 1.4, 5.1])
+        with f_top_title:
+            st.caption("**Snabbfiltrering på namn:**")
+        with f_top_btn1:
+            if st.button("☑️ Markera alla", key="btn_select_all_names", use_container_width=True):
+                for n in filter_names:
+                    st.session_state[f"name_chk_{n}"] = True
+                st.session_state["name_chk_other"] = True
+                st.rerun()
+        with f_top_btn2:
+            if st.button("⬜ Avmarkera alla", key="btn_deselect_all_names", use_container_width=True):
+                for n in filter_names:
+                    st.session_state[f"name_chk_{n}"] = False
+                st.session_state["name_chk_other"] = False
+                st.rerun()
+
+        display_filter_items = list(filter_names)
+        if has_other_names:
+            display_filter_items.append("__OTHER__")
+
+        cols_per_row = 8
+        for row_start in range(0, len(display_filter_items), cols_per_row):
+            row_items = display_filter_items[row_start:row_start + cols_per_row]
+            chk_cols = st.columns(cols_per_row)
+            for idx, item_name in enumerate(row_items):
+                with chk_cols[idx]:
+                    if item_name == "__OTHER__":
+                        if "name_chk_other" not in st.session_state:
+                            st.session_state["name_chk_other"] = True
+                        include_other_names = st.checkbox("Övriga", key="name_chk_other")
+                    else:
+                        chk_key = f"name_chk_{item_name}"
+                        if chk_key not in st.session_state:
+                            st.session_state[chk_key] = True
+                        if st.checkbox(item_name, key=chk_key):
+                            selected_filter_names.add(item_name.lower())
+
     col_header, col_rate = st.columns([2, 3])
     with col_header:
         st.subheader("Min Samling")
@@ -207,24 +263,21 @@ with tab1:
                 st.session_state["app_data"] = None
                 st.session_state["sets_data"] = None
                 st.rerun()
-
-    collection = sorted(app_data.get("collection", []), key=lambda x: int(x.get("Pärmnummer", 0) or 0))
-    app_data["collection"] = collection
     
     if collection:
-        df = pd.DataFrame(collection)
+        df_full = pd.DataFrame(collection)
         
-        if "Värde (USD)" in df.columns and "Värde (EUR)" not in df.columns:
-            df["Värde (EUR)"] = df["Värde (USD)"]
+        if "Värde (USD)" in df_full.columns and "Värde (EUR)" not in df_full.columns:
+            df_full["Värde (EUR)"] = df_full["Värde (USD)"]
         
         for col in ["Bild", "Pärmnummer", "Värde (EUR)", "Köpt för (EUR)", "Köpt för (SEK)", "Google Sök", "Egen Cardmarket Länk", "Engelskt Namn", "_id"]:
-            if col not in df.columns:
-                df[col] = None if col == "Köpt för (SEK)" else (0.0 if "Värde" in col or "Köpt" in col else "")
+            if col not in df_full.columns:
+                df_full[col] = None if col == "Köpt för (SEK)" else (0.0 if "Värde" in col or "Köpt" in col else "")
         
-        df["Bild"] = df["Bild"].fillna("").astype(str)
-        df["Värde (EUR)"] = pd.to_numeric(df["Värde (EUR)"], errors='coerce').fillna(0.0)
-        df["Köpt för (EUR)"] = pd.to_numeric(df["Köpt för (EUR)"], errors='coerce').fillna(0.0)
-        df["Egen Cardmarket Länk"] = df["Egen Cardmarket Länk"].fillna("").astype(str)
+        df_full["Bild"] = df_full["Bild"].fillna("").astype(str)
+        df_full["Värde (EUR)"] = pd.to_numeric(df_full["Värde (EUR)"], errors='coerce').fillna(0.0)
+        df_full["Köpt för (EUR)"] = pd.to_numeric(df_full["Köpt för (EUR)"], errors='coerce').fillna(0.0)
+        df_full["Egen Cardmarket Länk"] = df_full["Egen Cardmarket Länk"].fillna("").astype(str)
         
         # Bevara det låsta Köpt för (SEK) om det finns sparat; beräkna endast om det saknas helt
         def resolve_locked_kopt_sek(row):
@@ -234,9 +287,9 @@ with tab1:
                 return round(k_eur * eur_to_sek, 2)
             return round(float(val), 2)
 
-        df["Köpt för (SEK)"] = df.apply(resolve_locked_kopt_sek, axis=1)
+        df_full["Köpt för (SEK)"] = df_full.apply(resolve_locked_kopt_sek, axis=1)
         # Värde idag (SEK) uppdateras alltid mot aktuell växelkurs
-        df["Värde idag (SEK)"] = (df["Värde (EUR)"] * eur_to_sek).round(2)
+        df_full["Värde idag (SEK)"] = (df_full["Värde (EUR)"] * eur_to_sek).round(2)
 
         def get_year_for_row(row):
             set_bet = str(row.get("SetBet.", "")).strip()
@@ -246,7 +299,19 @@ with tab1:
                     return s.get("ReleaseYear", "")
             return ""
 
-        df["Utgivningsår"] = df.apply(get_year_for_row, axis=1)
+        df_full["Utgivningsår"] = df_full.apply(get_year_for_row, axis=1)
+
+        # Applicera namnfiltret på visad data
+        if filter_names:
+            def matches_name_filter(val):
+                nm = str(val or "").strip().lower()
+                if nm in known_lower:
+                    return nm in selected_filter_names
+                return include_other_names
+
+            df = df_full[df_full["Namn"].apply(matches_name_filter)].copy()
+        else:
+            df = df_full.copy()
 
         # Summeringar som visas ovanför respektive kolumn
         tot_kopt_eur = df["Köpt för (EUR)"].sum()
@@ -324,9 +389,13 @@ with tab1:
             )
 
             if st.button("💾 Spara ändringar", type="primary", use_container_width=True):
+                # Slå ihop redigerade rader med eventuella bortfiltrerade rader så att inget förloras vid filtrering
+                visible_ids = set(df["_id"].tolist())
+                hidden_rows = df_full[~df_full["_id"].isin(visible_ids)].to_dict(orient="records")
+                raw_edited = edited_df.to_dict(orient="records") + hidden_rows
+
                 current_ids = [item["_id"] for item in collection]
-                orig_df_map = df.set_index("_id").to_dict(orient="index")
-                raw_edited = edited_df.to_dict(orient="records")
+                orig_df_map = df_full.set_index("_id").to_dict(orient="index")
                 edited_map = {row.get("_id"): row for row in raw_edited if row.get("_id")}
                 
                 active_ids = [cid for cid in current_ids if cid in edited_map]
